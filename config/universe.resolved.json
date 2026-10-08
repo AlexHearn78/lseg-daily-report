@@ -1,0 +1,58 @@
+{
+  "ASML": {
+    "currency": "EUR",
+    "exchange": "Euronext Amsterdam",
+    "name": "ASML Holding N.V.",
+    "permid": 4295884869,
+    "ric": "ASML.AS"
+  },
+  "JPM": {
+    "currency": "USD",
+    "exchange": "New York Stock Exchange",
+    "name": "JPMorgan Chase & Co.",
+    "permid": 5000021791,
+    "ric": "JPM.N"
+  },
+  "MSFT": {
+    "currency": "USD",
+    "exchange": "NASDAQ Global Select Consolidated",
+    "name": "Microsoft Corporation",
+    "permid": 4295907168,
+    "ric": "MSFT.O"
+  },
+  "NESN": {
+    "currency": "CHF",
+    "exchange": "SIX Swiss Exchange",
+    "name": "Nestle SA",
+    "permid": 4295890634,
+    "ric": "NESN.S"
+  },
+  "NG": {
+    "currency": "GBp",
+    "exchange": "London Stock Exchange",
+    "name": "National Grid PLC",
+    "permid": 4295894468,
+    "ric": "NG.L"
+  },
+  "NOVO": {
+    "currency": "DKK",
+    "exchange": "OMX Nordic Exchange Copenhagen A/S",
+    "name": "Novo Nordisk A/S",
+    "permid": 4295865996,
+    "ric": "NOVOb.CO"
+  },
+  "NVDA": {
+    "currency": "USD",
+    "exchange": "NASDAQ Global Select Consolidated",
+    "name": "NVIDIA Corporation",
+    "permid": 4295914405,
+    "ric": "NVDA.O"
+  },
+  "SAP": {
+    "currency": "EUR",
+    "exchange": "Xetra",
+    "name": "SAP SE",
+    "permid": 5043321284,
+    "ric": "SAPG.DE"
+  }
+}

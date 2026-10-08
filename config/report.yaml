@@ -1,0 +1,4 @@
+# Report header and send-time label.
+title: "Daily Report"
+timezone: Europe/London      # IANA name; used for the "sent at" stamp
+timezone_label: London

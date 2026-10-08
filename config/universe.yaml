@@ -1,0 +1,27 @@
+# The names in the daily report. This is the only file you must edit.
+#
+#   key       short label used for files and the report (unique, A-Z/0-9)
+#   ric       LSEG RIC of the primary listing; used for prices, news,
+#             IBES consensus and fundamentals (never a bare ticker)
+#   group     holding | watchlist  (holdings are listed first)
+#   exchange  trading calendar code (XNYS for all US listings, XLON, XETR, XPAR, XAMS,
+#             XCSE, XSWX, XSTO, XMIL, XMAD ...); the name is skipped on
+#             that exchange's holidays
+#
+# After editing, run:  uv run workflows/resolve_universe.py
+# It checks every RIC against LSEG and writes universe.resolved.json
+# (company name, organisation PermID, quote currency). Commit both files.
+#
+# The list below is an example only.
+
+benchmark_ric: .SPX
+
+names:
+  - {key: MSFT, ric: MSFT.O,   group: holding,   exchange: XNYS}
+  - {key: JPM,  ric: JPM.N,    group: holding,   exchange: XNYS}
+  - {key: ASML, ric: ASML.AS,  group: holding,   exchange: XAMS}
+  - {key: SAP,  ric: SAPG.DE,  group: holding,   exchange: XETR}
+  - {key: NG,   ric: NG.L,     group: holding,   exchange: XLON}
+  - {key: NOVO, ric: NOVOb.CO, group: watchlist, exchange: XCSE}
+  - {key: NESN, ric: NESN.S,   group: watchlist, exchange: XSWX}
+  - {key: NVDA, ric: NVDA.O,   group: watchlist, exchange: XNYS}

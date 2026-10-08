@@ -1,0 +1,197 @@
+name: Daily Report
+
+# Weekdays at 20:30 UTC: 21:30 London in summer (BST), 20:30 in winter (GMT).
+# GitHub cron is UTC-only and does not follow daylight saving.
+#
+# Nothing runs until the LSEG secrets are set, so the public template and a
+# fresh copy of it stay idle. See README.md for setup.
+on:
+  schedule:
+    - cron: "30 20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      regime_only:
+        description: "Run only the market regime (froth) score"
+        type: boolean
+        default: false
+      report_only:
+        description: "Rebuild the report from the last scheduled run's outputs"
+        type: boolean
+        default: false
+      send_email:
+        description: "Send the report email"
+        type: boolean
+        default: true
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-config:
+    runs-on: ubuntu-latest
+    outputs:
+      lseg: ${{ steps.check.outputs.lseg }}
+      email: ${{ steps.check.outputs.email }}
+      claude: ${{ steps.check.outputs.claude }}
+    steps:
+      - id: check
+        env:
+          LSEG_CLIENT_ID: ${{ secrets.LSEG_CLIENT_ID }}
+          LSEG_CLIENT_SECRET: ${{ secrets.LSEG_CLIENT_SECRET }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          SMTP_TO: ${{ secrets.SMTP_TO }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set_flag() { if [ -n "$2" ]; then echo "$1=true"; else echo "$1=false"; fi; }
+          LSEG_OK=$([ -n "$LSEG_CLIENT_ID" ] && [ -n "$LSEG_CLIENT_SECRET" ] && echo yes)
+          EMAIL_OK=$([ -n "$SMTP_USER" ] && [ -n "$SMTP_APP_PASSWORD" ] && [ -n "$SMTP_TO" ] && echo yes)
+          {
+            set_flag lseg "$LSEG_OK"
+            set_flag email "$EMAIL_OK"
+            set_flag claude "$CLAUDE_CODE_OAUTH_TOKEN$ANTHROPIC_API_KEY"
+          } | tee -a "$GITHUB_OUTPUT" > flags.txt
+          {
+            echo "### Configuration"
+            echo '```'
+            cat flags.txt
+            echo '```'
+            if [ -z "$LSEG_OK" ]; then
+              echo "LSEG_CLIENT_ID and LSEG_CLIENT_SECRET are not set, so nothing runs. See README.md."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  daily-report:
+    needs: check-config
+    if: needs.check-config.outputs.lseg == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      actions: read    # report_only restores the last run's artifact
+      id-token: write  # used only by the optional Claude step
+    env:
+      LSEG_CLIENT_ID: ${{ secrets.LSEG_CLIENT_ID }}
+      LSEG_CLIENT_SECRET: ${{ secrets.LSEG_CLIENT_SECRET }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      SMTP_TO: ${{ secrets.SMTP_TO }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install uv + Python 3.14
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies (locked)
+        run: uv sync --frozen
+
+      # Regime history persists between runs in the Actions cache. FRED and
+      # CFTC are refetched in full each run; the LSEG S&P 500 skew history
+      # grows one point per run and is backfilled only when the cache is empty.
+      - name: Restore regime history
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: data/raw/regime/history
+          key: regime-history-${{ github.run_id }}
+          restore-keys: regime-history-
+
+      - name: "Stage 0: market regime (froth) score"
+        # If this fails the batch still runs, without regime context.
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          if [ ! -f data/raw/regime/history/lseg_spx_skew.csv ]; then
+            echo "No cached skew history - backfilling 4 years from LSEG"
+            uv run --frozen python workflows/regime_backfill.py --only lseg_skew --skew-years 4
+          fi
+          uv run --frozen python workflows/regime_froth.py --skip-cboe
+
+      - name: Save regime history
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: data/raw/regime/history
+          key: regime-history-${{ github.run_id }}
+
+      - name: Restore last run's outputs
+        if: ${{ inputs.report_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list --workflow daily-report.yml --event schedule --status completed \
+            --limit 1 --json databaseId --jq '.[0].databaseId')
+          echo "Restoring outputs from run $RUN_ID"
+          gh run download "$RUN_ID" -n "daily-report-$RUN_ID" -D data
+
+      - name: Run the analyst across the universe
+        if: ${{ !inputs.regime_only && !inputs.report_only }}
+        run: |
+          mkdir -p data/outputs/mdu/logs
+          LOG_FILE="data/outputs/mdu/logs/batch_$(date +%Y%m%d_%H%M%S).log"
+          set +e
+          uv run --frozen python -W ignore workflows/mdu_batch.py --no-report 2>&1 | tee "$LOG_FILE"
+          exit ${PIPESTATUS[0]}
+
+      # Python gathers the facts (price moves, LSEG news, earnings-call
+      # transcripts, regime) into pack.json. If Claude is configured it writes
+      # the commentary into sections.json; otherwise template text is used.
+      - name: Build briefing pack
+        id: pack
+        if: ${{ always() && !inputs.regime_only }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: uv run --frozen python workflows/mdu_briefing.py
+
+      - name: Write commentary (Claude, optional)
+        if: ${{ always() && steps.pack.outputs.dir != '' && needs.check-config.outputs.claude == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Keep off: the pack holds licensed LSEG data and would be printed
+          # into the Actions log.
+          show_full_output: "false"
+          prompt: |
+            Follow the instructions in workflows/prompts/briefing_writer.md.
+            The briefing pack is ${{ steps.pack.outputs.dir }}/pack.json.
+            Write your output to ${{ steps.pack.outputs.dir }}/sections.json, then stop.
+          claude_args: |
+            --model sonnet
+            --max-turns 10
+            --allowedTools "Read,Write"
+
+      - name: Build report
+        if: ${{ always() && !inputs.regime_only }}
+        run: uv run --frozen workflows/mdu_report.py
+
+      - name: Email report
+        if: ${{ always() && !inputs.regime_only && needs.check-config.outputs.email == 'true' && (github.event_name == 'schedule' || inputs.send_email) }}
+        run: uv run --frozen workflows/mdu_email.py
+
+      - name: Upload outputs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-${{ github.run_id }}
+          path: |
+            data/outputs/mdu/
+            data/outputs/regime/
+            data/outputs/briefing/
+            data/reports/
+          if-no-files-found: warn
+          retention-days: 30

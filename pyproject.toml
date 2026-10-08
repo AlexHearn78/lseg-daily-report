@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lseg-daily-report"
+version = "0.1.0"
+description = "Nightly equity report on LSEG data: market regime, per-name analyst scores, earnings calls and news, emailed as HTML."
+requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "httpx>=0.24",                     # LSEG MCP client
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "requests>=2.28",                  # regime sources (FRED, CFTC, ICI, CBOE)
+    "openpyxl>=3.1",                   # FINRA margin-statistics .xlsx
+    "lxml>=5.0",                       # ICI fund-flow tables (pandas.read_html)
+    "pydantic-settings>=2",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "pandas-market-calendars>=4.4",    # skip names on exchange holidays
+]
+
+[dependency-groups]
+dev = ["pytest>=7", "ruff"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lseg_quant"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,6 @@
+{
+  "MSFT": {"ric": "MSFT.O", "name": "Microsoft Corporation", "permid": 4295907168, "currency": "USD", "exchange": "NASDAQ Global Select Consolidated"},
+  "NVDA": {"ric": "NVDA.O", "name": "NVIDIA Corporation", "permid": 4295914405, "currency": "USD", "exchange": "NASDAQ Global Select Consolidated"},
+  "NG":   {"ric": "NG.L", "name": "National Grid PLC", "permid": 4295894468, "currency": "GBp", "exchange": "London Stock Exchange"},
+  "TSLA": {"ric": "TSLA.OLD", "name": "Stale entry", "permid": 1, "currency": "USD", "exchange": "x"}
+}

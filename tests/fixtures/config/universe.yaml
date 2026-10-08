@@ -1,0 +1,6 @@
+benchmark_ric: .SPX
+names:
+  - {key: MSFT, ric: MSFT.O,   group: holding,   exchange: XNYS}
+  - {key: NVDA, ric: NVDA.O,   group: holding,   exchange: XNYS}
+  - {key: NG,   ric: NG.L,     group: holding,   exchange: XLON}
+  - {key: TSLA, ric: TSLA.O,   group: watchlist, exchange: XNYS}
