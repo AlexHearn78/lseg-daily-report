@@ -128,6 +128,17 @@ def _parse_macro_payload(raw: str) -> list[dict[str, Any]]:
         data = json.loads(raw)
     except json.JSONDecodeError:
         return _parse_markdown_table(raw)
+    # The tool answers [{"dataType": ..., "options": ..., "response": {"data": ...}}]:
+    # rows for "list"/"series", a single observation dict for "latest".
+    if isinstance(data, list) and data and all(isinstance(d, dict) and "response" in d for d in data):
+        rows: list[dict[str, Any]] = []
+        for entry in data:
+            inner = (entry.get("response") or {}).get("data")
+            if isinstance(inner, list):
+                rows.extend(inner)
+            elif isinstance(inner, dict):
+                rows.append(inner)
+        return rows
     if isinstance(data, dict):
         for key in ("rows", "data", "observations", "series"):
             if key in data and isinstance(data[key], list):

@@ -131,13 +131,13 @@ def template_sections(pack: dict) -> dict:
     if spx:
         parts.append(f"The S&P 500 moved {fmt_pct(spx.get('ret_1d_pct'))} on the day "
                      f"and {fmt_pct(spx.get('ret_1m_pct'))} over the past month.")
-    y10, hy = m.get("us_10y_yield") or {}, m.get("high_yield_spread") or {}
+    y10, pc = m.get("us_10y_yield") or {}, m.get("eurex_putcall") or {}
     if y10:
         parts.append(f"The 10-year Treasury yield is {y10['last_pct']:.2f}%"
                      + (f" ({y10['chg_1m_bp']:+d} bp in a month)." if y10.get("chg_1m_bp") is not None else "."))
-    if hy:
-        parts.append(f"High-yield credit spreads are {hy['last_pct']:.2f}%"
-                     + (f" ({hy['chg_1m_bp']:+d} bp in a month)." if hy.get("chg_1m_bp") is not None else "."))
+    if pc.get("last") is not None:
+        parts.append(f"The Euro Stoxx 50 put/call ratio is {pc['last']:.2f}"
+                     + (f" against a 1-month average of {pc['avg_1m']:.2f}." if pc.get("avg_1m") is not None else "."))
     risk: list[str] = []
     fr = m.get("froth") or {}
     if fr.get("composite_score") is not None:
@@ -271,8 +271,9 @@ def series_panel(title: str, points: list[list[Any]], kind: str = "price",
     """A 12-month chart with its headline facts, for a detail panel.
 
     *kind* sets the units: ``price`` (changes in percent), ``pct`` (a yield or
-    spread in percent; changes in basis points) or ``bp`` (a curve in basis
-    points, with a zero line).
+    spread in percent; changes in basis points), ``bp`` (a curve in basis
+    points, with a zero line) or ``ratio`` (a plain ratio such as put/call,
+    with its 12-month average).
     """
     if len(points) < 2:
         return note("No history was saved for this run.")
@@ -287,6 +288,9 @@ def series_panel(title: str, points: list[list[Any]], kind: str = "price",
         if moves and moves.get("ret_1m_pct") is not None:
             facts.append(f"1M {fmt_pct(moves['ret_1m_pct'])}")
         facts.append(f"12M {fmt_pct((last / first - 1) * 100)}")
+    elif kind == "ratio":
+        fmt = lambda v: f"{v:.2f}"  # noqa: E731
+        facts = [f"last {fmt(last)}", f"12M average {fmt(sum(vals) / len(vals))}"]
     else:
         scale = 100 if kind == "pct" else 1   # changes always in basis points
         fmt = (lambda v: f"{v:.2f}%") if kind == "pct" else (lambda v: f"{v:+.0f}bp")  # noqa: E731
@@ -315,13 +319,13 @@ _TILE_CHARTS: dict[str, tuple[str, str]] = {
     "ftse_all_world": ("FTSE All-World (USD)", "price"),
     "us_10y_yield": ("US 10-year Treasury yield", "pct"),
     "curve_2s10s_bp": ("2s10s curve (10-year minus 2-year)", "bp"),
-    "high_yield_spread": ("US high-yield spread (ICE BofA OAS)", "pct"),
+    "eurex_putcall": ("Euro Stoxx 50 put/call ratio (Eurex)", "ratio"),
 }
 
 
 def _dashboard(pack: dict, details: dict[str, str] | None = None,
                charts: dict | None = None) -> str:
-    """Index, rates and credit tiles, then the four froth pillars as bars.
+    """Index, rates and options tiles, then the froth pillars as bars.
 
     *details* maps a pillar to its drilldown HTML and *charts* holds the
     12-month index series (attached report only; the email passes neither,
@@ -348,10 +352,11 @@ def _dashboard(pack: dict, details: dict[str, str] | None = None,
     if curve is not None:
         tiles.append(("2s10s", f"{curve:+.0f}bp", HEADING if curve >= 0 else RED, None))
         index_keys.append("curve_2s10s_bp")
-    hy = m.get("high_yield_spread") or {}
-    if hy.get("last_pct") is not None:
-        tiles.append(("HY spread", f"{hy['last_pct']:.2f}%", HEADING, _bp(hy.get("chg_1m_bp"))))
-        index_keys.append("high_yield_spread")
+    pc = m.get("eurex_putcall") or {}
+    if pc.get("last") is not None:
+        tiles.append(("SX5E put/call", f"{pc['last']:.2f}", HEADING,
+                      f"1M avg {pc['avg_1m']:.2f}" if pc.get("avg_1m") is not None else None))
+        index_keys.append("eurex_putcall")
     parts: list[str] = []
     if tiles:
         series = (charts or {}).get("indices") or {}

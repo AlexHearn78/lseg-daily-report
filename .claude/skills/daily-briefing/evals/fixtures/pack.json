@@ -6,13 +6,13 @@
   "macro": {
     "froth": {"as_of": "2026-10-07", "composite_score": 46.8, "band": "balanced",
               "velocity_flag": "stable", "structural_score": 62.0, "timing_score": 31.7,
-              "pillar_scores": {"valuation": 26.8, "leverage": 97.2, "positioning": 25.9, "liquidity": 37.5}},
+              "pillar_scores": {"valuation": 26.8, "positioning": 25.9, "liquidity": 37.5}},
     "regime": {"regime": "risk_on", "reasons": ["index 12m return +14.6%, curve not inverted"]},
     "sp500": {"as_of": "2026-10-07", "last": 6120.4, "ret_1d_pct": 0.2, "ret_1m_pct": 0.5},
     "ftse_all_world": {"as_of": "2026-10-07", "last": 612.35, "ret_1d_pct": 0.31, "ret_1m_pct": 0.8},
     "us_10y_yield": {"as_of": "2026-10-07", "last_pct": 5.2, "chg_1m_bp": 45},
     "curve_2s10s_bp": 46,
-    "high_yield_spread": {"as_of": "2026-10-07", "last_pct": 3.24, "chg_1m_bp": 59}
+    "eurex_putcall": {"as_of": "2026-10-07", "last": 1.24, "avg_1m": 1.11}
   },
   "macro_headlines": [
     {"date": "2026-10-07", "headline": "Treasury yields rise despite weak jobs report"},

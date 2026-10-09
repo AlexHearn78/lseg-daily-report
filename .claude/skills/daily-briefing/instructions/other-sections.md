@@ -13,7 +13,8 @@ Two paragraphs, **120 to 180 words in total**, separated by a blank line
 
 - **Paragraph 1: markets and why.** The S&P 500 and FTSE All-World day and
   month moves (`macro.sp500`, `macro.ftse_all_world`), the 10-year yield,
-  the 2s10s curve and high-yield spreads, then the likely reasons from
+  the 2s10s curve and the Euro Stoxx 50 put/call ratio (`macro.eurex_putcall`),
+  then the likely reasons from
   `macro_headlines`. Attribute reasons to the headlines; if they do not
   explain the move, do not invent one.
 - **Paragraph 2: risk appetite.** The froth composite and band, velocity,

@@ -1,6 +1,6 @@
-"""External market-data sources for the regime froth score."""
+"""Data sources for the regime froth score. Every series comes from LSEG."""
 from __future__ import annotations
 
-from lseg_quant.regime.sources import cboe, cftc, fred, finra, ici
+from lseg_quant.regime.sources import lseg
 
-__all__ = ["cboe", "cftc", "fred", "finra", "ici"]
+__all__ = ["lseg"]

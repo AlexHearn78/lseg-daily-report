@@ -384,7 +384,7 @@ def macro_block(froth: dict | None, store: Any,
     ftse = (index_closes or {}).get("ftse_all_world")
     if ftse is not None and (aw := _index_block(ftse)) is not None:
         block["ftse_all_world"] = aw
-    d10, d2, hy = (store.read(n).dropna() for n in ("dgs10", "dgs2", "hy_oas"))
+    d10, d2, pc = (store.read(n).dropna() for n in ("dgs10", "dgs2", "eurex_putcall_sx5e"))
     if len(d10):
         prev = _value_days_ago(d10, 30)
         block["us_10y_yield"] = {
@@ -394,12 +394,12 @@ def macro_block(froth: dict | None, store: Any,
         }
         if len(d2):
             block["curve_2s10s_bp"] = round((float(d10.iloc[-1]) - float(d2.iloc[-1])) * 100)
-    if len(hy):
-        prev = _value_days_ago(hy, 30)
-        block["high_yield_spread"] = {
-            "as_of": str(hy.index[-1].date()),
-            "last_pct": round(float(hy.iloc[-1]), 2),
-            "chg_1m_bp": round((float(hy.iloc[-1]) - prev) * 100) if prev is not None else None,
+    if len(pc):
+        month = pc[pc.index > pc.index[-1] - pd.Timedelta(days=30)]
+        block["eurex_putcall"] = {
+            "as_of": str(pc.index[-1].date()),
+            "last": round(float(pc.iloc[-1]), 2),
+            "avg_1m": round(float(month.mean()), 2),
         }
     return block
 
@@ -549,9 +549,9 @@ def build_charts(date: str, tickers: list[TickerInput], store: Any,
                  as_of: dt.date | None = None) -> dict[str, Any]:
     """Twelve months of daily values per ticker, index and rate, as [date, value] pairs.
 
-    Index keys match the pack's ``macro`` block. Yields and the high-yield
-    spread are in percent; ``curve_2s10s_bp`` is 10-year minus 2-year, in
-    basis points.
+    Index keys match the pack's ``macro`` block. Yields are in percent;
+    ``curve_2s10s_bp`` is 10-year minus 2-year, in basis points;
+    ``eurex_putcall`` is the Euro Stoxx 50 put/call ratio.
     """
     as_of = as_of or dt.date.fromisoformat(date)
     indices = {"sp500": _series_points(store.read("spx_close"), as_of)}
@@ -562,7 +562,7 @@ def build_charts(date: str, tickers: list[TickerInput], store: Any,
     if len(d10) and len(d2):
         curve = pd.concat([d10.rename("d10"), d2.rename("d2")], axis=1).dropna()
         indices["curve_2s10s_bp"] = _series_points((curve["d10"] - curve["d2"]) * 100, as_of)
-    indices["high_yield_spread"] = _series_points(store.read("hy_oas"), as_of)
+    indices["eurex_putcall"] = _series_points(store.read("eurex_putcall_sx5e"), as_of)
     return {
         "date": date,
         "indices": {k: v for k, v in indices.items() if v},

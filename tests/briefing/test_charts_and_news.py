@@ -79,24 +79,24 @@ def test_charts_are_capped_at_the_run_date_and_a_year_back() -> None:
 def test_charts_include_rates_with_the_curve_in_basis_points() -> None:
     idx = pd.bdate_range(end="2026-09-11", periods=300)
     store = _Store({"dgs10": pd.Series(4.5, index=idx), "dgs2": pd.Series(4.1, index=idx),
-                    "hy_oas": pd.Series(3.2, index=idx)})
+                    "eurex_putcall_sx5e": pd.Series(1.3, index=idx)})
     ind = build_charts("2026-09-11", [], store)["indices"]
     assert ind["us_10y_yield"][-1] == ["2026-09-11", 4.5]
     assert ind["curve_2s10s_bp"][-1] == ["2026-09-11", 40.0]
-    assert ind["high_yield_spread"][-1][1] == 3.2
+    assert ind["eurex_putcall"][-1][1] == 1.3
 
 
 def test_rate_tiles_open_their_charts() -> None:
     pack = _pack_with_story()
     pack["macro"].update(us_10y_yield={"last_pct": 4.95, "chg_1m_bp": 25}, curve_2s10s_bp=39,
-                         high_yield_spread={"last_pct": 2.7, "chg_1m_bp": -2})
+                         eurex_putcall={"last": 1.45, "avg_1m": 1.30})
     days = [str(d.date()) for d in pd.bdate_range(end="2026-09-11", periods=250)]
     rising = [[d, 4.0 + i / 250] for i, d in enumerate(days)]
     charts = {"indices": {"us_10y_yield": rising,
                           "curve_2s10s_bp": [[d, 39.0 - i / 10] for i, d in enumerate(days)],
-                          "high_yield_spread": [[d, 2.7] for d in days]}}
+                          "eurex_putcall": [[d, 1.3] for d in days]}}
     page = briefing_page_html(template_sections(pack), pack, charts=charts)
-    for key in ("us_10y_yield", "curve_2s10s_bp", "high_yield_spread"):
+    for key in ("us_10y_yield", "curve_2s10s_bp", "eurex_putcall"):
         assert f"toggleDetail(this, 'px-{key}')" in page
     assert "12M +100bp" in page            # 4.0% to 5.0% over the year
     assert "inverted below" in page        # zero line on the curve chart

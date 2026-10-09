@@ -93,25 +93,24 @@ class TestComputeFrothScore:
 
     def test_full_composite_shape(self) -> None:
         metrics = [
-            self._metric("hy_oas", "valuation", 60.0, invert=True),
-            self._metric("margin_debt", "leverage", 60.0),
-            self._metric("cftc_net", "positioning", 60.0),
+            self._metric("spx_stretch", "valuation", 60.0),
+            self._metric("eurex_putcall_sx5e", "positioning", 60.0, invert=True),
+            self._metric("lseg_spx_skew", "positioning", 60.0, invert=True),
             self._metric("funding_spread", "liquidity", 60.0, invert=True),
         ]
         out = compute_froth_score(metrics)
-        assert set(out["pillar_scores"]) == {"valuation", "leverage", "positioning", "liquidity"}
+        assert set(out["pillar_scores"]) == {"valuation", "positioning", "liquidity"}
         assert out["structural_score"] is not None
         assert out["timing_score"] is not None
         assert 0 <= out["composite_score"] <= 100
         assert out["band"] in {"capitulation", "risk_off", "balanced", "elevated", "frothy"}
 
     def test_missing_pillar_renormalises_weights(self) -> None:
-        metrics = [self._metric("margin_debt", "leverage", 90.0)]
+        metrics = [self._metric("lseg_spx_skew", "positioning", 90.0)]
         out = compute_froth_score(metrics)
-        # Only leverage present -> composite equals leverage pillar score.
-        assert out["composite_score"] == pytest.approx(out["pillar_scores"]["leverage"])
-        assert set(out["low_confidence_pillars"]) >= {
-            "valuation", "positioning", "liquidity"}
+        # Only positioning present -> composite equals the positioning pillar score.
+        assert out["composite_score"] == pytest.approx(out["pillar_scores"]["positioning"])
+        assert set(out["low_confidence_pillars"]) >= {"valuation", "liquidity"}
 
     def test_short_history_flags_low_confidence(self) -> None:
         short = _hist(days=60)

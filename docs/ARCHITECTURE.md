@@ -9,7 +9,7 @@ weekdays at 20:30 UTC.
 
 | Stage | Script | Output under `data/outputs/` |
 |---|---|---|
-| 0. Market regime | `workflows/regime_froth.py` (FRED, CFTC, ICI, LSEG S&P 500 skew) | `regime/<date>/froth_score.json` |
+| 0. Market regime | `workflows/regime_froth.py`: S&P 500, SOFR, fed funds, US CPI, Treasury curve, Euro Stoxx 50 put/call and S&P 500 skew, all from LSEG | `regime/<date>/froth_score.json` |
 | 1. Analyst batch | `workflows/mdu_batch.py` runs `mdu_run.py` once per name, each in its own subprocess | `mdu/<YYYYMMDD>/audit_*.jsonl`, `narrative_<KEY>.md` |
 | 2. Briefing pack | `workflows/mdu_briefing.py`: price moves, LSEG news, earnings-call transcripts, regime | `briefing/<YYYYMMDD>/pack.json`, `sections_template.json` |
 | 3. Commentary (optional) | `anthropics/claude-code-action` runs the `daily-briefing` skill with read-only LSEG news tools; `check_sections.py` gates the result | `briefing/<YYYYMMDD>/sections.json`, `lookups.json` |

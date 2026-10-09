@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Daily regime froth-score refresh (Stage 0 of the MDU cron job).
+"""Daily market regime and froth score (Stage 0 of the daily report).
 
-Refreshes every reachable source into the CSV history store, computes
-today's froth score + market regime, and writes:
+Refreshes the LSEG series in the history store (backfilling ten years the
+first time), takes today's S&P 500 skew point, computes the froth score and
+market regime, and writes:
 
     data/outputs/regime/<YYYY-MM-DD>/froth_score.json
 
+Every input comes from LSEG (see lseg_quant.regime.sources.lseg).
+
 Usage:
     uv run workflows/regime_froth.py               # refresh + score
-    uv run workflows/regime_froth.py --score-only  # score from store only
+    uv run workflows/regime_froth.py --score-only  # score from the store only
 """
 from __future__ import annotations
 
@@ -21,7 +24,6 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
-sys.path.insert(0, str(_REPO_ROOT))
 
 from dotenv import load_dotenv
 
@@ -30,6 +32,7 @@ load_dotenv(".env")
 import pandas as pd
 
 from lseg_quant.config import settings
+from lseg_quant.mdu.mcp_client import MCPClient
 from lseg_quant.regime.daily import (
     OUTPUT_DIRNAME,
     compute_froth_payload,
@@ -37,78 +40,38 @@ from lseg_quant.regime.daily import (
 )
 from lseg_quant.regime.history import HistoryStore
 from lseg_quant.regime.lseg_feeds import spx_skew
-from lseg_quant.regime.sources import fred
-from workflows.regime_backfill import (
-    backfill_cboe,
-    backfill_cftc,
-    backfill_finra,
-    backfill_ici,
-    backfill_spx,
-)
+from lseg_quant.regime.sources import lseg
 
 logger = logging.getLogger("regime_froth")
 
 
-def refresh_sources(store: HistoryStore, skip_skew: bool,
-                    skip_cboe: bool = False) -> None:
-    """Best-effort incremental refresh; each source is error-isolated."""
-    steps: list[tuple[str, object]] = [
-        ("fred", lambda: _refresh_fred(store)),
-        ("spx", lambda: backfill_spx(store)),
-        ("cftc", lambda: backfill_cftc(store)),
-        ("finra", lambda: backfill_finra(store)),
-        ("ici", lambda: backfill_ici(store)),
-    ]
-    for name, fn in steps:
+def refresh_sources(store: HistoryStore, skip_skew: bool = False) -> None:
+    """Best-effort refresh of every LSEG input; each source is error-isolated."""
+    if not os.environ.get("LSEG_CLIENT_ID"):
+        logger.warning("[refresh] LSEG_CLIENT_ID not set - scoring stored history only")
+        return
+    with MCPClient(client_id=os.environ["LSEG_CLIENT_ID"],
+                   client_secret=os.environ["LSEG_CLIENT_SECRET"]) as mcp:
+        for name, error in lseg.refresh(store, mcp).items():
+            logger.warning("[refresh] %s failed: %s", name, error)
+        if skip_skew:
+            return
         try:
-            logger.info("[refresh] %s", name)
-            fn()  # type: ignore[operator]
+            today = pd.Timestamp.now().strftime("%Y-%m-%d")
+            skew = spx_skew(mcp, today)
+            if skew is not None:
+                store.upsert("lseg_spx_skew", pd.Series([skew], index=[pd.Timestamp(today)],
+                                                        name="lseg_spx_skew"))
         except Exception as exc:  # noqa: BLE001 - source isolation
-            logger.warning("[refresh] %s failed: %s", name, exc)
-
-    if not skip_cboe:
-        try:
-            logger.info("[refresh] cboe monthly archives")
-            backfill_cboe(store, lookback_days=0)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("[refresh] cboe failed: %s", exc)
-
-    if not skip_skew and os.environ.get("LSEG_CLIENT_ID"):
-        try:
-            with _mcp_client() as mcp:
-                today = pd.Timestamp.now().strftime("%Y-%m-%d")
-                skew = spx_skew(mcp, today)
-                if skew is not None:
-                    store.upsert("lseg_spx_skew",
-                                 pd.Series([skew], index=[pd.Timestamp(today)],
-                                           name="lseg_spx_skew"))
-        except Exception as exc:  # noqa: BLE001
             logger.warning("[refresh] skew failed: %s", exc)
-
-
-def _refresh_fred(store: HistoryStore) -> None:
-    raw = fred.fetch_all()
-    for name, series in raw.items():
-        store.upsert(name, series)
-    for name, series in fred.derived_metrics(raw).items():
-        store.upsert(name, series)
-
-
-def _mcp_client():
-    from lseg_quant.mdu.mcp_client import MCPClient
-    return MCPClient(client_id=os.environ["LSEG_CLIENT_ID"],
-                     client_secret=os.environ["LSEG_CLIENT_SECRET"])
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Daily froth-score refresh")
     parser.add_argument("--score-only", action="store_true",
-                        help="Skip source refresh; score existing history")
+                        help="Skip the LSEG refresh; score existing history")
     parser.add_argument("--skip-skew", action="store_true",
                         help="Skip the LSEG equity_vol_surface call")
-    parser.add_argument("--skip-cboe", action="store_true",
-                        help="Skip the CBOE archives (2019-only, so always "
-                             "excluded as stale; saves ~2 min)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO,
@@ -117,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
 
     store = HistoryStore()
     if not args.score_only:
-        refresh_sources(store, skip_skew=args.skip_skew, skip_cboe=args.skip_cboe)
+        refresh_sources(store, skip_skew=args.skip_skew)
 
     payload = compute_froth_payload(store=store)
     payload["market_regime"] = compute_regime_payload(store=store)

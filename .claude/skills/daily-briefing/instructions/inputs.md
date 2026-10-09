@@ -12,7 +12,8 @@ lookups (`lookups.json`).
 | `summary` | Counts of BUY / HOLD / SELL / failed | Headline context only. |
 | `thresholds.buy`, `thresholds.sell` | Composite-score signal thresholds | Closest to changing. |
 | `macro.sp500`, `macro.ftse_all_world` | Last close, `ret_1d_pct`, `ret_1m_pct` | Market paragraph. FTSE All-World is in US dollars. |
-| `macro.us_10y_yield`, `macro.high_yield_spread` | `last_pct`, `chg_1m_bp` | Market paragraph. |
+| `macro.us_10y_yield` | `last_pct`, `chg_1m_bp` | Market paragraph. |
+| `macro.eurex_putcall` | Euro Stoxx 50 put/call ratio: `last`, `avg_1m` | Market paragraph. Above its average = more hedging. |
 | `macro.curve_2s10s_bp` | 10-year minus 2-year yield, basis points | Market paragraph. |
 | `macro.froth` | Composite 0-100, `band`, `velocity_flag`, `pillar_scores` | Risk paragraph. High = stretched. |
 | `macro.regime` | `regime`, `reasons`, trend and funding stress | Risk paragraph. |

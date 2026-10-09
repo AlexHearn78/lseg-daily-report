@@ -118,14 +118,14 @@ def test_stale_metric_excluded_from_score(tmp_path: Path):
 
     store = HistoryStore(tmp_path)
     idx = pd.bdate_range(end="2026-09-10", periods=1000)
-    store.upsert("hy_oas", pd.Series(range(1000), index=idx, dtype=float))
-    old = pd.date_range("2019-01-31", periods=8, freq="ME")
-    store.upsert("cboe_putcall_monthly", pd.Series(range(8), index=old, dtype=float))
+    store.upsert("spx_stretch", pd.Series(range(1000), index=idx, dtype=float))
+    old = pd.bdate_range(end="2019-08-30", periods=300)
+    store.upsert("eurex_putcall_sx5e", pd.Series(1.2, index=old, dtype=float))
 
     payload = compute_froth_payload(as_of=pd.Timestamp("2026-09-11"), store=store)
-    assert payload["stale_metrics"] == {"cboe_putcall_monthly": "2019-08-31"}
-    assert "cboe_putcall_monthly" not in payload["metrics"]
-    assert "hy_oas" in payload["metrics"]
+    assert payload["stale_metrics"] == {"eurex_putcall_sx5e": "2019-08-30"}
+    assert "eurex_putcall_sx5e" not in payload["metrics"]
+    assert "spx_stretch" in payload["metrics"]
 
 
 def test_payload_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

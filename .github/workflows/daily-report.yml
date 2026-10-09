@@ -78,7 +78,6 @@ jobs:
     env:
       LSEG_CLIENT_ID: ${{ secrets.LSEG_CLIENT_ID }}
       LSEG_CLIENT_SECRET: ${{ secrets.LSEG_CLIENT_SECRET }}
-      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -96,9 +95,9 @@ jobs:
       - name: Install dependencies (locked)
         run: uv sync --frozen
 
-      # Regime history persists between runs in the Actions cache. FRED and
-      # CFTC are refetched in full each run; the LSEG S&P 500 skew history
-      # grows one point per run and is backfilled only when the cache is empty.
+      # Regime history persists between runs in the Actions cache. The first
+      # run backfills ten years of every LSEG series (and four years of weekly
+      # S&P 500 skew); later runs fetch only the days since the last one.
       - name: Restore regime history
         uses: actions/cache/restore@v6.1.0
         with:
@@ -115,7 +114,7 @@ jobs:
             echo "No cached skew history - backfilling 4 years from LSEG"
             uv run --frozen python workflows/regime_backfill.py --only lseg_skew --skew-years 4
           fi
-          uv run --frozen python workflows/regime_froth.py --skip-cboe
+          uv run --frozen python workflows/regime_froth.py
 
       - name: Save regime history
         if: always()

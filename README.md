@@ -10,8 +10,8 @@ risk gates and records a BUY, HOLD or SELL signal. It then builds one
 report with these sections:
 
 - **Market dashboard**: S&P 500, FTSE All-World, US 10-year yield, 2s10s
-  curve, high-yield spread, and a 0–100 market froth score with its four
-  pillars
+  curve, Euro Stoxx 50 put/call ratio, and a 0–100 market froth score with
+  its three pillars
 - **Today's moves**: the largest moves relative to each name's normal day
 - **Top stories**: the three most newsworthy moves, written from the full
   text of LSEG news, with their sources and the model score that pushed
@@ -58,8 +58,9 @@ the one local step.
 4. In the GitHub repo, open **Settings → Secrets and variables → Actions** and
    add the secrets below.
 5. Open **Actions → Daily Report → Run workflow**. The first run takes
-   longer, because it backfills four years of S&P 500 skew history. Read the
-   run log and the report, not just the green tick.
+   longer, because it backfills ten years of LSEG market history and four
+   years of weekly S&P 500 skew. Read the run log and the report, not just
+   the green tick.
 
 After that it runs every weekday at 20:30 UTC.
 
@@ -69,7 +70,6 @@ After that it runs every weekday at 20:30 UTC.
 |---|---|---|
 | `LSEG_CLIENT_ID`, `LSEG_CLIENT_SECRET` | **yes** | your LSEG service account. Without them nothing runs. |
 | `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_TO` | for email | sender, app password, recipients (comma-separated). `SMTP_HOST` / `SMTP_PORT` default to Gmail. Without these the report is still built and kept as a run artifact. |
-| `FRED_API_KEY` | recommended | [free key](https://fred.stlouisfed.org/docs/api/api_key.html); most of the froth score's macro inputs come from FRED |
 | `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` | optional | lets Claude write the commentary sections; see below |
 
 ## Commentary: three ways
@@ -127,8 +127,10 @@ scoring and the identity and currency rules.
 - Per-share consensus in a different currency from the quote (for example a
   DKK listing with EUR consensus) is dropped rather than converted. Those
   names score valuation on the remaining measures.
-- FINRA margin statistics are a manual download (`data/raw/regime/finra/`);
-  without the file that froth input is skipped.
+- The froth score uses only LSEG data. There is no LSEG source for margin
+  debt or a licensed credit-spread history on every account, so the score
+  has three pillars (valuation, positioning, liquidity); see
+  [docs/REGIME_FROTH.md](docs/REGIME_FROTH.md).
 
 ## Licence
 

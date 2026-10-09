@@ -27,23 +27,15 @@ from lseg_quant.regime.score import (
 logger = logging.getLogger(__name__)
 
 PILLAR_OF: dict[str, str] = {
-    "hy_oas": "valuation",
-    "margin_debit_balances": "leverage",
-    "margin_loans_z1": "leverage",
-    "excess_leverage": "leverage",
-    "cftc_net_spec": "positioning",
+    "spx_stretch": "valuation",
     "lseg_spx_skew": "positioning",
-    "cboe_putcall_monthly": "positioning",
-    "cboe_putcall": "positioning",
-    "ici_equity_flows": "positioning",
+    "eurex_putcall_sx5e": "positioning",
     "funding_spread": "liquidity",
     "real_policy_rate": "liquidity",
 }
 INVERT_OF: dict[str, bool] = {
-    "hy_oas": True,
-    "cboe_putcall": True,
-    "cboe_putcall_monthly": True,
     "lseg_spx_skew": True,
+    "eurex_putcall_sx5e": True,
     "funding_spread": True,
     "real_policy_rate": True,
 }
@@ -55,17 +47,11 @@ OUTPUT_DIRNAME = "regime"
 # publication lag: Z.1 quarterly data is dated to the quarter start and
 # lands ~5 months later.
 MAX_STALENESS_DAYS: dict[str, int] = {
-    "hy_oas": 14,
+    "spx_stretch": 14,
+    "lseg_spx_skew": 14,
+    "eurex_putcall_sx5e": 14,
     "funding_spread": 14,
     "real_policy_rate": 14,
-    "lseg_spx_skew": 14,
-    "cboe_putcall": 14,
-    "cftc_net_spec": 30,
-    "ici_equity_flows": 30,
-    "margin_debit_balances": 90,
-    "cboe_putcall_monthly": 90,
-    "margin_loans_z1": 400,
-    "excess_leverage": 400,
 }
 
 # How much history froth_score.json keeps for the report charts.
@@ -181,7 +167,7 @@ def compute_froth_payload(as_of: pd.Timestamp | None = None,
                                      as_of, result["pillar_scores"].get(p))
                     for p in pillars_ff.columns},
         "structural": _ending_today(
-            _monthly_points(pillars_ff[["valuation", "leverage"]].mean(axis=1),
+            _monthly_points(pillars_ff[["valuation"]].mean(axis=1),
                             CHART_YEARS, as_of, 1), as_of, result["structural_score"]),
         "timing": _ending_today(
             _monthly_points(pillars_ff[["positioning", "liquidity"]].mean(axis=1),

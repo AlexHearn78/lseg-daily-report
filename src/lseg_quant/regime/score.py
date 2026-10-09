@@ -1,12 +1,13 @@
 """Froth score math — percentile ranking, pillar aggregation, velocity.
 
-Implements the spec in ``regime_froth_score.md`` verbatim:
 - each metric -> percentile rank against its own trailing history (0-100),
   oriented so higher always means more frothy;
 - pillar score = average of its metric scores;
-- structural = avg(valuation, leverage); timing = avg(positioning, liquidity);
-- composite = weighted sum {valuation .20, leverage .25, positioning .30,
-  liquidity .25};
+- structural = valuation; timing = avg(positioning, liquidity);
+- composite = weighted sum {valuation .27, positioning .40, liquidity .33}.
+  Every input is LSEG data; the original design's leverage pillar (margin
+  debt) has no LSEG source and is left out, and its weight is spread
+  proportionally over the other three;
 - series with < 3 years of history use min-max scaling and are flagged
   ``low_confidence``;
 - velocity flag compares composite vs its value ~90 days ago (+/-15 points).
@@ -24,10 +25,9 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 PILLAR_WEIGHTS: dict[str, float] = {
-    "valuation": 0.20,
-    "leverage": 0.25,
-    "positioning": 0.30,
-    "liquidity": 0.25,
+    "valuation": 0.27,
+    "positioning": 0.40,
+    "liquidity": 0.33,
 }
 
 LOW_CONFIDENCE_YEARS = 3.0
@@ -48,7 +48,7 @@ class MetricInput:
     """One metric feeding a froth-score pillar."""
 
     name: str
-    pillar: str  # valuation | leverage | positioning | liquidity
+    pillar: str  # valuation | positioning | liquidity
     value: float | None
     history: pd.Series  # datetime-indexed trailing observations (excl. value if absent)
     invert: bool = False  # True when LOW raw values mean HIGH froth
@@ -181,7 +181,7 @@ def compute_froth_score(metrics: list[MetricInput],
     else:
         composite = float("nan")
 
-    structural_parts = [pillar_scores[p] for p in ("valuation", "leverage") if not np.isnan(pillar_scores[p])]
+    structural_parts = [pillar_scores[p] for p in ("valuation",) if not np.isnan(pillar_scores[p])]
     timing_parts = [pillar_scores[p] for p in ("positioning", "liquidity") if not np.isnan(pillar_scores[p])]
 
     return {

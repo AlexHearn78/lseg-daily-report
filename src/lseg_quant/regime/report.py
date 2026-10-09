@@ -42,10 +42,6 @@ from lseg_quant.reporting.theme import (
 logger = logging.getLogger(__name__)
 
 
-def _bn(v: float) -> str:
-    return f"${v / 1000:,.0f}bn"
-
-
 @dataclass(frozen=True)
 class MetricInfo:
     """How to label, format and explain one froth metric."""
@@ -59,56 +55,15 @@ class MetricInfo:
 
 
 METRIC_INFO: dict[str, MetricInfo] = {
-    "hy_oas": MetricInfo(
-        label="High-yield credit spread",
-        source="ICE BofA US High Yield OAS, via FRED",
-        fmt=lambda v: f"{v:.2f}%",
-        what="Extra yield investors demand to hold junk bonds instead of Treasuries.",
-        why="A tight spread means investors are taking credit risk for little reward, "
-            "so a LOW spread scores as frothy.",
-        caveat="This is a credit measure standing in for valuation; there is no equity "
-               "valuation metric in the pillar yet. FRED serves about three years of "
-               "daily history, so the ranking window is short.",
-    ),
-    "margin_debit_balances": MetricInfo(
-        label="Margin debt (FINRA)",
-        source="FINRA margin statistics, monthly",
-        fmt=_bn,
-        what="Money investors have borrowed from brokers to buy securities.",
-        why="More borrowed money in the market means more forced selling in a fall, "
-            "so a HIGH level scores as frothy.",
-        caveat="Ranked as a dollar level, which grows with the market over time.",
-    ),
-    "margin_loans_z1": MetricInfo(
-        label="Margin loans (Fed Z.1)",
-        source="Federal Reserve Z.1, BOGZ1FL663067003Q, quarterly",
-        fmt=_bn,
-        what="Margin loans made by US brokers and dealers, from the Fed's financial "
-             "accounts. Used because FINRA's file is often blocked.",
-        why="More borrowed money in the market means more forced selling in a fall, "
-            "so a HIGH level scores as frothy.",
-        caveat="Ranked as a dollar level against its own 12-year history. A dollar "
-               "level grows with the market, so it ranks near the top in almost any "
-               "rising market. Data is dated to the quarter start and arrives about "
-               "five months later.",
-    ),
-    "excess_leverage": MetricInfo(
-        label="Excess leverage",
-        source="Margin loans (Fed Z.1) and S&P 500, quarterly",
-        fmt=lambda v: f"{v:+.1f} pts",
-        what="Year-on-year growth in margin loans minus year-on-year growth in the "
-             "S&P 500.",
-        why="Borrowing growing faster than prices means investors are adding leverage, "
-            "not just riding gains, so a HIGH reading scores as frothy.",
-        caveat="Quarterly data since 2018, so it ranks against only about 30 points.",
-    ),
-    "cftc_net_spec": MetricInfo(
-        label="Speculator net position",
-        source="CFTC Commitments of Traders, S&P 500 consolidated, weekly",
-        fmt=lambda v: f"{v / 1000:+,.1f}k contracts",
-        what="Non-commercial (speculative) longs minus shorts in S&P 500 futures.",
-        why="Speculators crowded long leaves fewer buyers left, so a HIGH net long "
-            "scores as frothy.",
+    "spx_stretch": MetricInfo(
+        label="S&P 500 stretch",
+        source="LSEG .SPX daily close",
+        fmt=lambda v: f"{v:+.1f}%",
+        what="How far the S&P 500 sits above or below its 200-day average.",
+        why="Prices far above their own trend mean buyers have run ahead, so a "
+            "HIGH stretch scores as frothy.",
+        caveat="A price measure standing in for valuation: no licensed credit-spread "
+               "or index-valuation history was available through LSEG for this pillar.",
     ),
     "lseg_spx_skew": MetricInfo(
         label="S&P 500 put skew",
@@ -119,43 +74,29 @@ METRIC_INFO: dict[str, MetricInfo] = {
         why="Cheap protection means few investors are hedging, so a LOW skew scores "
             "as frothy.",
     ),
-    "cboe_putcall": MetricInfo(
-        label="Put/call ratio",
-        source="CBOE total equity put/call, daily",
+    "eurex_putcall_sx5e": MetricInfo(
+        label="Euro Stoxx 50 put/call ratio",
+        source="LSEG .PRSTXE.EX (Eurex), daily",
         fmt=lambda v: f"{v:.2f}",
-        what="Put option volume divided by call option volume.",
-        why="Few puts relative to calls means little hedging and lots of upside "
-            "betting, so a LOW ratio scores as frothy.",
-    ),
-    "cboe_putcall_monthly": MetricInfo(
-        label="Put/call ratio (monthly)",
-        source="CBOE archive, monthly",
-        fmt=lambda v: f"{v:.2f}",
-        what="Monthly average of put volume divided by call volume.",
-        why="A LOW ratio means little hedging, so it scores as frothy.",
-    ),
-    "ici_equity_flows": MetricInfo(
-        label="Equity fund flows",
-        source="ICI weekly long-term fund flows, equity",
-        fmt=lambda v: f"${v:,.0f}m",
-        what="Net money going into US equity mutual funds each week.",
-        why="Strong inflows mean retail money is chasing stocks, so HIGH inflows "
-            "score as frothy.",
+        what="Volume of Euro Stoxx 50 index puts traded on Eurex divided by calls.",
+        why="Few puts relative to calls means little hedging, so a LOW ratio scores "
+            "as frothy.",
+        caveat="A single day's ratio is noisy; it ranks against ten years of daily values.",
     ),
     "funding_spread": MetricInfo(
         label="Funding spread (SOFR - EFFR)",
-        source="New York Fed SOFR and EFFR, via FRED, daily",
+        source="LSEG USDSOFR= and USONFFE=FEDR fixings (New York Fed), daily",
         fmt=lambda v: f"{v * 100:+.0f} bp",
-        what="Secured overnight rate minus the fed funds rate: how tight short-term "
-             "dollar funding is.",
+        what="Secured overnight rate minus the effective fed funds rate: how tight "
+             "short-term dollar funding is.",
         why="A low or negative spread means cash is easy to borrow, so a LOW spread "
             "scores as frothy.",
     ),
     "real_policy_rate": MetricInfo(
         label="Real policy rate",
-        source="Fed funds upper target minus CPI inflation (YoY), via FRED",
+        source="LSEG effective fed funds fixing minus US CPI YoY (qa_macroeconomic USCONPRCE)",
         fmt=lambda v: f"{v:+.2f}%",
-        what="The Fed's policy rate after inflation.",
+        what="The overnight policy rate after inflation.",
         why="A low or negative real rate means money is loose, so a LOW rate scores "
             "as frothy.",
         caveat="Each CPI print is used from about 45 days after its month, when it "
@@ -165,12 +106,11 @@ METRIC_INFO: dict[str, MetricInfo] = {
 
 PILLAR_QUESTION: dict[str, str] = {
     "valuation": "How much are investors paying for risk?",
-    "leverage": "How much borrowed money is in the market?",
     "positioning": "How crowded and unhedged are investors?",
     "liquidity": "How easy and cheap is money?",
 }
 
-STRUCTURAL = ("valuation", "leverage")
+STRUCTURAL = ("valuation",)
 TIMING = ("positioning", "liquidity")
 
 
@@ -312,7 +252,7 @@ def pillar_detail_html(ctx: dict[str, Any], pillar: str) -> str:
 # ---------------------------------------------------------------------------
 
 def froth_detail_html(ctx: dict[str, Any]) -> str:
-    """How the four pillars add up to the composite, and the structural/timing split."""
+    """How the three pillars add up to the composite, and the structural/timing split."""
     pillars = ctx.get("pillar_scores") or {}
     present = {p: s for p, s in pillars.items() if s is not None}
     w_sum = sum(PILLAR_WEIGHTS[p] for p in present) or 1.0
@@ -338,7 +278,7 @@ def froth_detail_html(ctx: dict[str, Any]) -> str:
     timing = _score(ctx.get("timing_score"))
     return "".join([
         _p(f'{_b(f"Froth {comp}")} is a weighted '
-           'average of the four pillars. Bands: under 20 capitulation, 20 to 40 risk off, '
+           'average of the three pillars. Bands: under 20 capitulation, 20 to 40 risk off, '
            '40 to 60 balanced, 60 to 80 elevated, 80 and over frothy. Velocity compares '
            'today with about 90 days ago and flags a move of more than 15 points; today '
            f'it reads {_b(velocity)}.'),
@@ -346,9 +286,8 @@ def froth_detail_html(ctx: dict[str, Any]) -> str:
         _p("No data for " + _e(", ".join(missing)) + "; the other weights were scaled up "
            "to sum to 100%.", color=FAINT, size=12) if missing else "",
         _p(f'{_b(f"Structural {struct}")} is the '
-           f'average of valuation ({_score(p.get("valuation"))}) and leverage '
-           f'({_score(p.get("leverage"))}). These move slowly and say how stretched the '
-           f'market is. {_b(f"Timing {timing}")} is the '
+           f'valuation pillar ({_score(p.get("valuation"))}). It moves slowly and says how '
+           f'stretched the market is. {_b(f"Timing {timing}")} is the '
            f'average of positioning ({_score(p.get("positioning"))}) and liquidity '
            f'({_score(p.get("liquidity"))}). These move faster and say whether the '
            'conditions that let froth keep building are still in place.'),
