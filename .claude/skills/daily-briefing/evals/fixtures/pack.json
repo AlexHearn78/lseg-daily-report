@@ -1,0 +1,77 @@
+{
+  "_note": "Synthetic eval fixture in the shape of a real pack. Companies, prices, stories and headlines are invented; RTRS marks where a wire story would sit.",
+  "date": "2026-10-07",
+  "summary": {"n_tickers": 4, "n_buy": 0, "n_hold": 4, "n_sell": 0, "n_failed": 0},
+  "thresholds": {"buy": 0.25, "sell": -0.25},
+  "macro": {
+    "froth": {"as_of": "2026-10-07", "composite_score": 46.8, "band": "balanced",
+              "velocity_flag": "stable", "structural_score": 62.0, "timing_score": 31.7,
+              "pillar_scores": {"valuation": 26.8, "leverage": 97.2, "positioning": 25.9, "liquidity": 37.5}},
+    "regime": {"regime": "risk_on", "reasons": ["index 12m return +14.6%, curve not inverted"]},
+    "sp500": {"as_of": "2026-10-07", "last": 6120.4, "ret_1d_pct": 0.2, "ret_1m_pct": 0.5},
+    "ftse_all_world": {"as_of": "2026-10-07", "last": 612.35, "ret_1d_pct": 0.31, "ret_1m_pct": 0.8},
+    "us_10y_yield": {"as_of": "2026-10-07", "last_pct": 5.2, "chg_1m_bp": 45},
+    "curve_2s10s_bp": 46,
+    "high_yield_spread": {"as_of": "2026-10-07", "last_pct": 3.24, "chg_1m_bp": 59}
+  },
+  "macro_headlines": [
+    {"date": "2026-10-07", "headline": "Treasury yields rise despite weak jobs report"},
+    {"date": "2026-10-07", "headline": "Fed officials weigh a pause against another rate rise"}
+  ],
+  "top_stories": [
+    {
+      "key": "HLDN", "name": "Halden Pharma", "ric": "HLDN.CO", "group": "holding",
+      "action": "HOLD", "confidence": 0.67,
+      "moves": {"as_of": "2026-10-07", "last": 84.6, "ret_1d_pct": -3.4, "ret_5d_pct": -7.5,
+                "ret_1m_pct": -7.3, "daily_vol_pct": 1.62, "move_vs_normal": -2.1},
+      "drivers": ["P/E: 12.2x is cheap", "Trend: -7.3% 1m - mild pullback"],
+      "why_selected": ["moved 2.1x its normal daily swing"],
+      "headlines": [{"date": "2026-10-06", "headline": "Halden Pharma wins Japanese approval for Slimra in MASH"}],
+      "stories": [
+        {"date": "2026-10-07", "source": "RTRS",
+         "headline": "NMC endorses lifestyle changes over GLP-1 drugs in child obesity fight",
+         "text": "The Nordic Medicines Council on Wednesday issued its first global guidelines on obesity in children. It recommended diet, exercise and counselling ahead of weight-loss drugs. GLP-1 drugs may be considered for adolescents aged 10 to 19 only after supervised programmes have failed; for children under 10 it advised against medication because of doubts over long-term safety. Council figures show 2.4 million people aged 5 to 19 in the region lived with obesity in 2025. Halden Pharma's Slimra is approved for some adolescents aged 12 and older in the United States and the European Union."}
+      ],
+      "earnings": null
+    },
+    {
+      "key": "CRVX", "name": "Corvex", "ric": "CRVX.O", "group": "holding",
+      "action": "HOLD", "confidence": 0.55,
+      "moves": {"as_of": "2026-10-07", "last": 57.12, "ret_1d_pct": -0.03, "ret_5d_pct": -4.45,
+                "ret_1m_pct": -2.59, "daily_vol_pct": 2.68, "move_vs_normal": -0.01},
+      "drivers": ["P/E: 23.5x is reasonable", "News: 10 headlines, no shock signals"],
+      "why_selected": ["held an earnings call in the last 5 days"],
+      "headlines": [],
+      "stories": [
+        {"date": "2026-10-06", "source": "RTRS",
+         "headline": "UPDATE 2-DOJ probes Corvex's licensing deal with AI startup Vantir, Valley Ledger reports",
+         "text": "The US Justice Department has opened an inquiry into Corvex's agreement to license technology from AI chip start-up Vantir and hire some of its staff, the Valley Ledger reported, citing people familiar with the matter. Corvex agreed the deal in December. Corvex declined to comment."},
+        {"date": "2026-10-06", "source": "RTRS",
+         "headline": "UPDATE 1-Corvex plans major expansion of data centre capacity in Canada",
+         "text": "Corvex plans to expand data centre capacity in Canada with local partners, the company said, without giving a cost."}
+      ],
+      "earnings": null
+    },
+    {
+      "key": "LNDQ", "name": "Lindqvist", "ric": "LNDQ.PA", "group": "watchlist",
+      "action": "HOLD", "confidence": 0.28,
+      "moves": {"as_of": "2026-10-07", "last": 36.8, "ret_1d_pct": 2.2, "ret_5d_pct": 4.1,
+                "ret_1m_pct": -0.2, "daily_vol_pct": 1.71, "move_vs_normal": 1.3},
+      "drivers": ["P/E: 177.7x is expensive", "Trend: -0.2% 1m - flat"],
+      "why_selected": ["moved 1.3x its normal daily swing"],
+      "headlines": [],
+      "stories": [
+        {"date": "2026-10-06", "source": "RTRS",
+         "headline": "BRIEF-Lindqvist Completes EUR 500 Mln Bond Issuance",
+         "text": "Lindqvist said it completed a 500 million euro bond issue maturing in 2033 with a 3.25% coupon, to refinance existing debt."}
+      ],
+      "earnings": null
+    }
+  ],
+  "earnings_watch": [],
+  "closest_to_changing": [
+    {"key": "HRBR", "name": "Harbour Bancorp", "composite": 0.142, "nearest_signal": "BUY",
+     "gap": 0.108, "drivers": ["P/E: 14.1x is reasonable", "Trend: -2.5% 1m - mild pullback"]}
+  ],
+  "tickers": [{"key": "HLDN"}, {"key": "CRVX"}, {"key": "LNDQ"}, {"key": "HRBR"}]
+}

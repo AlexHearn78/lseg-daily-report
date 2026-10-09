@@ -1,0 +1,55 @@
+{
+  "headline": "NMC guidance on child obesity drugs hit Halden Pharma, while a US probe hung over Corvex.",
+  "market_macro": "The S&P 500 rose 0.2% to 6120.4 and the FTSE All-World gained 0.3%, leaving both up less than 1% over the month. Rates set the tone. The US 10-year yield reached 5.2%, 45 basis points higher in a month, and the 2s10s curve stood at 46 basis points. High-yield spreads widened 59 basis points over the month to 3.24%. Headlines had Treasury yields rising despite a weak jobs report and Fed officials weighing a pause against another rate rise.\n\nThe froth score is 46.8, in the balanced band, and its velocity is stable. Leverage is the one stretched pillar at 97.2. Valuation (26.8), positioning (25.9) and liquidity (37.5) are calm. The regime reads risk on, on a 12-month index return of 14.6% and a curve that is not inverted. Wider credit spreads and a stretched leverage reading are the two places where risk appetite looks thinner than the composite.",
+  "top_stories": [
+    {
+      "ticker": "HLDN",
+      "title": "NMC guidance on child GLP-1 use",
+      "body": "Halden Pharma fell 3.4%, about 2x a normal day, extending a 7.5% slide over the week. Reuters reported on 7 Oct that the Nordic Medicines Council issued its first global guidelines on obesity in children, putting diet, exercise and counselling ahead of weight-loss drugs. The agency said GLP-1 drugs should reach adolescents aged 10 to 19 only after supervised programmes fail, and advised against medication for children under 10 over doubts about long-term safety. Slimra is already approved for some adolescents aged 12 and older in the United States and the European Union, so the guidance touches a small slice of current sales. Its weight is on assumptions about future demand from younger patients, where the NMC now sets a cautious line. The model still reads the shares as cheap at 12.2x earnings and holds them with 67% confidence. Investors should buy the dip while regulators decide.",
+      "sources": [
+        {
+          "source": "RTRS",
+          "date": "2026-10-07",
+          "headline": "NMC endorses lifestyle changes over GLP-1 drugs in child obesity fight"
+        }
+      ]
+    },
+    {
+      "ticker": "CRVX",
+      "title": "DOJ inquiry into the Vantir licensing deal",
+      "body": "Corvex closed flat on an ordinary day, after losing 4.5% over the past week. The news that matters is legal. Reuters reported on 6 Oct, citing the Valley Ledger, that the US Justice Department has opened an inquiry into Corvex's agreement to license technology from AI chip start-up Vantir and hire some of its staff, a deal struck in December. Corvex declined to comment. An inquiry is early stage and the reports give no timetable, but it puts a competition question over the way Corvex buys in technology and talent without a full takeover. Separately, Corvex plans to expand data centre capacity in Canada with local partners. With a P/E of 23.5x that it reads as reasonable and no shock in the headlines, the model keeps a hold at 55% confidence. The next step to watch is whether the department escalates to a formal investigation.",
+      "sources": [
+        {
+          "source": "RTRS",
+          "date": "2026-10-06",
+          "headline": "UPDATE 2-DOJ probes Corvex's licensing deal with AI startup Vantir, Valley Ledger reports"
+        },
+        {
+          "source": "RTRS",
+          "date": "2026-10-06",
+          "headline": "UPDATE 1-Corvex plans major expansion of data centre capacity in Canada"
+        }
+      ]
+    },
+    {
+      "ticker": "LNDQ",
+      "title": "Bond refinancing at a 3.25% coupon",
+      "body": "Lindqvist rose 2.2%, about 1.3x a normal day, and is up 4.1% over the week. No company news explains the size of the move. The only item in the period is a refinancing: Reuters reported on 6 Oct that the cable maker completed a 500 million euro bond maturing in 2033 with a 3.25% coupon, to refinance existing debt. Locking in seven-year money at that rate lengthens the debt profile and removes a funding question, though it does not change the operating story. The shares carry a high multiple, and the model reads them as expensive at 177.7x earnings. That keeps it at a low-conviction hold, with confidence of 28%, on a watchlist name whose price has gone nowhere over the month. The coupon on any further issuance will show what lenders charge the company for longer-dated funding.",
+      "sources": [
+        {
+          "source": "RTRS",
+          "date": "2026-10-06",
+          "headline": "BRIEF-Lindqvist Completes EUR 500 Mln Bond Issuance"
+        }
+      ]
+    }
+  ],
+  "earnings_watch": [],
+  "closest_to_changing": [
+    {
+      "ticker": "HRBR",
+      "title": "Close to a buy signal",
+      "body": "Harbour Bancorp's composite score of 0.142 sits 0.108 below the 0.25 buy threshold, so its 1-month trend of -2.5% would have to turn up for the signal to change."
+    }
+  ]
+}

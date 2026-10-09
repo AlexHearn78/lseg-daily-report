@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "daily-briefing/lookups-schema/1.0",
+  "title": "lookups.json: live LSEG news results the writer relied on",
+  "description": "Written next to pack.json. Empty list when no lookups were made. check_sections.py traces numbers and cited headlines to pack.json plus these excerpts; the report shows a cited source only if its headline is in the pack or here.",
+  "type": "array",
+  "maxItems": 8,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["ticker", "tool", "source", "date", "headline", "excerpt"],
+    "properties": {
+      "ticker": {"type": "string", "pattern": "^[A-Z0-9.]{1,12}$"},
+      "tool": {"enum": ["important_company_news", "news_nl_search"]},
+      "source": {"type": "string", "minLength": 2, "maxLength": 40},
+      "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+      "headline": {"type": "string", "minLength": 5, "maxLength": 200},
+      "excerpt": {"type": "string", "minLength": 20, "maxLength": 1500}
+    }
+  }
+}

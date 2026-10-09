@@ -125,6 +125,30 @@ jobs:
           path: data/raw/regime/history
           key: regime-history-${{ github.run_id }}
 
+      # Daily IBES consensus snapshot: LSEG serves only the latest consensus,
+      # so the earnings signal's pre-results surprise and post-results
+      # revisions need our own history. Error-isolated; kept in the cache.
+      - name: Restore consensus history
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: data/raw/consensus
+          key: consensus-history-${{ github.run_id }}
+          restore-keys: consensus-history-
+
+      - name: Consensus snapshot
+        if: ${{ !inputs.regime_only }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: uv run --frozen python workflows/consensus_snapshot.py
+
+      - name: Save consensus history
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: data/raw/consensus
+          key: consensus-history-${{ github.run_id }}
+
       - name: Restore last run's outputs
         if: ${{ inputs.report_only }}
         env:
@@ -133,7 +157,12 @@ jobs:
           RUN_ID=$(gh run list --workflow daily-report.yml --event schedule --status completed \
             --limit 1 --json databaseId --jq '.[0].databaseId')
           echo "Restoring outputs from run $RUN_ID"
-          gh run download "$RUN_ID" -n "daily-report-$RUN_ID" -D data
+          # Unpack aside, then copy without overwriting: Stage 0 has already
+          # written today's froth score, which the artifact may also hold.
+          gh run download "$RUN_ID" -n "daily-report-$RUN_ID" -D "$RUNNER_TEMP/last-run"
+          # (cp -n exits non-zero on some coreutils versions when it skips a file.)
+          mkdir -p data && { cp -Rn "$RUNNER_TEMP/last-run/." data/ || true; }
+          test -d data/outputs/mdu
 
       - name: Run the analyst across the universe
         if: ${{ !inputs.regime_only && !inputs.report_only }}
@@ -144,9 +173,11 @@ jobs:
           uv run --frozen python -W ignore workflows/mdu_batch.py --no-report 2>&1 | tee "$LOG_FILE"
           exit ${PIPESTATUS[0]}
 
-      # Python gathers the facts (price moves, LSEG news, earnings-call
+      # Python gathers the facts (price moves, full-text LSEG news, earnings-call
       # transcripts, regime) into pack.json. If Claude is configured it writes
-      # the commentary into sections.json; otherwise template text is used.
+      # the commentary into sections.json with the daily-briefing skill, making
+      # a few read-only LSEG news lookups when the pack does not explain a
+      # move. Otherwise template text is used.
       - name: Build briefing pack
         id: pack
         if: ${{ always() && !inputs.regime_only }}
@@ -154,10 +185,17 @@ jobs:
         timeout-minutes: 15
         run: uv run --frozen python workflows/mdu_briefing.py
 
+      - name: LSEG MCP config for Claude
+        # Without it Claude still writes from the pack alone.
+        if: ${{ always() && steps.pack.outputs.dir != '' && needs.check-config.outputs.claude == 'true' }}
+        run: |
+          uv run --frozen python workflows/lseg_mcp_config.py --out "$RUNNER_TEMP/lseg-mcp.json" \
+            || echo '{"mcpServers": {}}' > "$RUNNER_TEMP/lseg-mcp.json"
+
       - name: Write commentary (Claude, optional)
         if: ${{ always() && steps.pack.outputs.dir != '' && needs.check-config.outputs.claude == 'true' }}
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 20
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -170,10 +208,20 @@ jobs:
             Follow the instructions in workflows/prompts/briefing_writer.md.
             The briefing pack is ${{ steps.pack.outputs.dir }}/pack.json.
             Write your output to ${{ steps.pack.outputs.dir }}/sections.json, then stop.
+          # Reads the daily-briefing skill and pack.json, makes a few news
+          # lookups, writes sections.json and runs the gate (up to 3 rounds).
           claude_args: |
+            --mcp-config ${{ runner.temp }}/lseg-mcp.json
             --model sonnet
-            --max-turns 10
-            --allowedTools "Read,Write"
+            --max-turns 30
+            --allowedTools "Read,Write,Glob,Bash(python3 .claude/skills/daily-briefing/scripts/check_sections.py *),mcp__lseg__important_company_news,mcp__lseg__news_nl_search"
+
+      - name: Briefing gate
+        if: ${{ always() && steps.pack.outputs.dir != '' && needs.check-config.outputs.claude == 'true' }}
+        continue-on-error: true
+        run: |
+          D="${{ steps.pack.outputs.dir }}"
+          { echo "### Briefing gate"; echo '```'; python3 .claude/skills/daily-briefing/scripts/check_sections.py "$D" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build report
         if: ${{ always() && !inputs.regime_only }}

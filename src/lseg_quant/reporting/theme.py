@@ -116,15 +116,20 @@ def inset(body: str, margin_bottom: int = 10) -> str:
 
 
 def stat_tiles(tiles: list[tuple[str, str, str, str | None]], size: int = 20,
-               base: str = CARD) -> str:
-    """Equal-width tiles of (label, value, colour, sub-line or None)."""
+               base: str = CARD, cell_attrs: list[str] | None = None) -> str:
+    """Equal-width tiles of (label, value, colour, sub-line or None).
+
+    ``cell_attrs`` adds raw HTML attributes to each tile's cell (attached
+    report only, e.g. to make a tile open a detail panel).
+    """
     width = f"{100 / len(tiles):.0f}%"
+    attrs = cell_attrs or [""] * len(tiles)
     cells = []
-    for label, value, color, sub in tiles:
+    for (label, value, color, sub), extra in zip(tiles, attrs):
         sub_html = (f'<div style="font-family:{MONO};font-size:11px;color:{FAINT};'
                     f'margin-top:1px;white-space:nowrap">{esc(sub)}</div>') if sub else ""
         cells.append(
-            f'<td width="{width}" style="background:{base};border-radius:8px;'
+            f'<td width="{width}"{" " + extra if extra else ""} style="background:{base};border-radius:8px;'
             f'padding:10px 12px;vertical-align:top">'
             f'<div style="font-family:{MONO};font-size:{size}px;font-weight:600;color:{color};'
             f'white-space:nowrap">{esc(value)}</div>'

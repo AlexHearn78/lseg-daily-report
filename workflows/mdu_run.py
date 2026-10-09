@@ -122,10 +122,13 @@ def run(as_of: dt.datetime, settings: MDUSettings | None = None,
             client_id=settings.lseg_client_id,
             client_secret=settings.lseg_client_secret,
         ) as mcp:
+            # A date range, not a count: count requests return only about a
+            # month of rows, which leaves the 12-month features empty.
             prices = mcp.get_historical_prices(
                 ric=settings.ticker,
                 interval="P1D",
-                count=500,
+                start=(as_of - dt.timedelta(days=365 * settings.lookback_years)).strftime("%Y-%m-%d"),
+                end=(as_of + dt.timedelta(days=1)).strftime("%Y-%m-%d"),
             )
             ticker_label = (ticker_key or settings.ticker_display).lower()
             audit.record_data_snapshot(f"{ticker_label}_prices", {
@@ -137,8 +140,9 @@ def run(as_of: dt.datetime, settings: MDUSettings | None = None,
             })
             logger.info("  Prices: %d rows", len(prices))
             if {"timestamp", "close"} <= set(prices.columns):
-                # Last ~3 months of closes for the nightly briefing's move stats.
-                tail = prices.tail(60)
+                # Last ~12 months of closes for the nightly briefing's move
+                # stats and the report's price charts.
+                tail = prices.tail(260)
                 audit.record_data_snapshot("price_tail", {
                     "dates": [str(ts)[:10] for ts in tail["timestamp"]],
                     "closes": [round(float(c), 4) for c in tail["close"]],

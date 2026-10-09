@@ -12,7 +12,7 @@ weekdays at 20:30 UTC.
 | 0. Market regime | `workflows/regime_froth.py` (FRED, CFTC, ICI, LSEG S&P 500 skew) | `regime/<date>/froth_score.json` |
 | 1. Analyst batch | `workflows/mdu_batch.py` runs `mdu_run.py` once per name, each in its own subprocess | `mdu/<YYYYMMDD>/audit_*.jsonl`, `narrative_<KEY>.md` |
 | 2. Briefing pack | `workflows/mdu_briefing.py`: price moves, LSEG news, earnings-call transcripts, regime | `briefing/<YYYYMMDD>/pack.json`, `sections_template.json` |
-| 3. Commentary (optional) | `anthropics/claude-code-action` follows `workflows/prompts/briefing_writer.md` | `briefing/<YYYYMMDD>/sections.json` |
+| 3. Commentary (optional) | `anthropics/claude-code-action` runs the `daily-briefing` skill with read-only LSEG news tools; `check_sections.py` gates the result | `briefing/<YYYYMMDD>/sections.json`, `lookups.json` |
 | 4. Report and email | `workflows/mdu_report.py`, `workflows/mdu_email.py` | `data/reports/Daily EQ Research/<date>.html` |
 
 Every stage after 0 still runs if an earlier one fails, so a bad night still

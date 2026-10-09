@@ -1,8 +1,9 @@
 # House writing rules
 
 Apply these to every sentence in the report. The reader is a professional
-portfolio manager, reading after the close. They want
-the facts and the model's view, quickly, in plain British English.
+portfolio manager, reading after the close. They want the facts and the
+model's view, quickly, in plain British English. The word lists below are
+also in `lexicon.json`, which `scripts/check_sections.py` enforces.
 
 These rules govern sentences. Keep any structure, sections, headings, tables
 or JSON shape that your task instructions require.

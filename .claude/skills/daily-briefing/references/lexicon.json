@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "updated": "2026-10-08",
+  "notes": "Enforced by scripts/check_sections.py. Matching is case-insensitive on whole words or phrases. 'fail' lists block the run; 'warn' lists are reported only.",
+  "fail": {
+    "banned_words": [
+      "delve", "delves", "delving", "foster", "fosters", "fostering",
+      "utilize", "utilise", "utilizes", "utilises", "facilitate", "facilitates",
+      "empower", "empowers", "streamline", "streamlines", "robust",
+      "cutting-edge", "paradigm shift", "game changer", "game-changer",
+      "tapestry", "realm", "beacon", "landscape", "multifaceted", "meticulous",
+      "intricate", "paramount", "pivotal", "transformative", "elevate",
+      "elevates", "embark", "embarks", "supercharge", "harness", "harnesses",
+      "ever-evolving", "soaring", "soared", "soars", "plunging", "plunged",
+      "plunges", "skyrocketing", "skyrocketed", "massive"
+    ],
+    "empty_phrases": [
+      "it's worth noting", "it is worth noting", "it's important to note",
+      "it is important to note", "at the end of the day", "when it comes to",
+      "at its core", "the reality is", "in terms of", "with regard to",
+      "in order to", "going forward", "amid"
+    ],
+    "advice_phrases": [
+      "you should buy", "you should sell", "we recommend", "we suggest",
+      "investors should", "time to buy", "time to sell", "a good time to"
+    ],
+    "puffery": [
+      "marks a pivotal moment", "plays a vital role", "plays a key role",
+      "analysts believe", "markets fear", "investors fear", "the key point is",
+      "as you can see", "here's the thing"
+    ]
+  },
+  "warn": {
+    "filler_words": [
+      "just", "simply", "actually", "truly", "fundamentally", "importantly",
+      "crucially", "notably", "inherently", "inevitably", "significantly"
+    ],
+    "interpretive_ing_endings": [
+      "suggesting", "highlighting", "underscoring", "reflecting", "signalling",
+      "signaling", "arguing", "indicating"
+    ]
+  },
+  "no_news_phrases": [
+    "no company news", "no news explains", "no news story explains",
+    "no headline explains", "no news behind", "no specific news",
+    "no identifiable news", "nothing in the news explains"
+  ]
+}

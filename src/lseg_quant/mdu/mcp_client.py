@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from typing import Any
 
 import httpx
 import pandas as pd
@@ -243,16 +244,25 @@ class MCPClient:
     # High-level fetchers
     # ------------------------------------------------------------------
 
-    def get_historical_prices(self, ric: str, interval: str = "P1D", count: int = 500) -> pd.DataFrame:
+    def get_historical_prices(self, ric: str, interval: str = "P1D", count: int = 500,
+                              start: str | None = None, end: str | None = None) -> pd.DataFrame:
         """Fetch historical price summaries.
+
+        With ``start`` (YYYY-MM-DD, optionally ``end``) the date range is sent
+        instead of ``count``. The service has been returning only about a
+        month of rows for ``count`` requests, while a date range returns the
+        whole window.
 
         Returns DataFrame with columns: timestamp, open, high, low, close, volume.
         """
-        resp = self.call_tool("historical_pricing_summaries", {
-            "universe": ric,
-            "interval": interval,
-            "count": count,
-        })
+        args: dict[str, Any] = {"universe": ric, "interval": interval}
+        if start:
+            args["start"] = start
+            if end:
+                args["end"] = end
+        else:
+            args["count"] = count
+        resp = self.call_tool("historical_pricing_summaries", args)
         raw = self._extract_text(resp)
         if not raw or raw.strip() == "":
             logger.warning("Empty response for historical prices: %s", ric)

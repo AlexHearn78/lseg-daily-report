@@ -93,7 +93,7 @@ def analyze(context: ResearchContext) -> AnalystDecision:
     risk_flags.extend(news_notes)
 
     # --- 6. Vol Score ---
-    atm_iv = vol_mod.get("atm_iv_1m")
+    atm_iv = vol_mod.get("atm_iv_1m_pct")  # the key research._module_vol writes
     vol_score_val, vol_reasoning = score_vol(atm_iv)
     reasoning.extend(vol_reasoning)
 

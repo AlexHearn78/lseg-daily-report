@@ -220,11 +220,11 @@ def historical_percentiles(history: pd.Series, window_days: int = 365 * 12,
     return 100.0 - pct if invert else pct
 
 
-def historical_composite(metric_histories: dict[str, pd.Series],
-                         pillar_of: dict[str, str],
-                         invert_of: dict[str, bool] | None = None,
-                         window_days: int = 365 * 12) -> pd.Series:
-    """Reconstruct a daily composite-score time series from raw histories."""
+def historical_pillars(metric_histories: dict[str, pd.Series],
+                       pillar_of: dict[str, str],
+                       invert_of: dict[str, bool] | None = None,
+                       window_days: int = 365 * 12) -> pd.DataFrame:
+    """Reconstruct daily pillar-score time series from raw histories."""
     invert_of = invert_of or {}
     daily_frames: dict[str, pd.Series] = {}
     for name, hist in metric_histories.items():
@@ -235,19 +235,31 @@ def historical_composite(metric_histories: dict[str, pd.Series],
 
     pillars_df = pd.DataFrame(index=aligned.index,
                               columns=list(PILLAR_WEIGHTS), dtype=float)
-    for pillar, w in PILLAR_WEIGHTS.items():
+    for pillar in PILLAR_WEIGHTS:
         cols = [c for c in aligned.columns if pillar_of.get(c) == pillar]
         if cols:
             pillars_df[pillar] = aligned[cols].mean(axis=1)
-    total_w = 0.0
+    return pillars_df
+
+
+def composite_from_pillars(pillars_df: pd.DataFrame) -> pd.Series:
+    """Weighted composite per row, renormalised over the pillars present."""
     acc = pd.Series(0.0, index=pillars_df.index)
     for pillar, w in PILLAR_WEIGHTS.items():
         col = pillars_df[pillar]
         valid = col.notna()
         acc[valid] += col[valid] * w
-        total_w = total_w  # weight renormalisation handled below per-row
     counts = pillars_df.notna().sum(axis=1)
     w_present = pillars_df.notna().mul(pd.Series(PILLAR_WEIGHTS)).sum(axis=1)
     composite = acc / w_present.where(w_present > 0)
     composite[counts == 0] = np.nan
     return composite.dropna(how="any")
+
+
+def historical_composite(metric_histories: dict[str, pd.Series],
+                         pillar_of: dict[str, str],
+                         invert_of: dict[str, bool] | None = None,
+                         window_days: int = 365 * 12) -> pd.Series:
+    """Reconstruct a daily composite-score time series from raw histories."""
+    return composite_from_pillars(historical_pillars(
+        metric_histories, pillar_of, invert_of, window_days=window_days))

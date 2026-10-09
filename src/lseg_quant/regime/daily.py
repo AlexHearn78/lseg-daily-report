@@ -17,9 +17,11 @@ from lseg_quant.config import settings
 from lseg_quant.regime.history import HistoryStore
 from lseg_quant.regime.market_regime import compute_market_regime
 from lseg_quant.regime.score import (
+    LOW_CONFIDENCE_YEARS,
     MetricInput,
+    composite_from_pillars,
     compute_froth_score,
-    historical_composite,
+    historical_pillars,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,13 +68,18 @@ MAX_STALENESS_DAYS: dict[str, int] = {
     "excess_leverage": 400,
 }
 
+# How much history froth_score.json keeps for the report charts.
+CHART_YEARS = 10
+SPX_CHART_YEARS = 2
+
 
 def load_metric_inputs(store: HistoryStore, as_of: pd.Timestamp | None = None,
-                       ) -> tuple[list[MetricInput], pd.Series, dict[str, str]]:
+                       ) -> tuple[list[MetricInput], pd.Series, dict[str, str], pd.DataFrame]:
     """Build today's metric inputs + historical composite for velocity.
 
     Metrics whose latest observation is older than ``MAX_STALENESS_DAYS``
     are left out of both and returned as ``{name: last_observation_date}``.
+    The fourth element is the daily pillar-score history behind the composite.
     """
     as_of = (as_of or pd.Timestamp.now()).normalize()
     metrics: list[MetricInput] = []
@@ -96,8 +103,52 @@ def load_metric_inputs(store: HistoryStore, as_of: pd.Timestamp | None = None,
             name=name, pillar=pillar, value=value,
             history=history_excl, invert=INVERT_OF.get(name, False),
         ))
-    prior = historical_composite(histories, PILLAR_OF, INVERT_OF)
-    return metrics, prior, stale
+    pillars = historical_pillars(histories, PILLAR_OF, INVERT_OF)
+    prior = composite_from_pillars(pillars)
+    return metrics, prior, stale, pillars
+
+
+def _monthly_points(series: pd.Series, years: int, as_of: pd.Timestamp,
+                    digits: int = 2) -> list[list[Any]]:
+    """Last observation of each month over the trailing *years*, as [date, value]."""
+    s = series.dropna().sort_index()
+    if not len(s):
+        return []
+    s = s[s.index >= as_of - pd.DateOffset(years=years)]
+    s = s.groupby(s.index.to_period("M")).tail(1)
+    return [[d.strftime("%Y-%m-%d"), round(float(v), digits)] for d, v in s.items()]
+
+
+def _ending_today(points: list[list[Any]], as_of: pd.Timestamp,
+                  today: float | None) -> list[list[Any]]:
+    """Replace the current month's point with today's actual score.
+
+    The rebuilt history ranks with pandas' tie convention, so its last point
+    can differ slightly from the score the report shows; the chart should end
+    on the reported number.
+    """
+    month = as_of.strftime("%Y-%m")
+    kept = [p for p in points if not p[0].startswith(month)]
+    if today is not None:
+        kept.append([as_of.strftime("%Y-%m-%d"), today])
+    return kept
+
+
+def _metric_detail(m: MetricInput) -> dict[str, Any]:
+    """Raw value, dates and scoring method for one metric (report drilldown)."""
+    hist = m.history.dropna()
+    span_years = ((hist.index.max() - hist.index.min()).days / 365.25
+                  if len(hist) >= 2 else 0.0)
+    method = ("percentile" if span_years >= LOW_CONFIDENCE_YEARS and len(hist) >= 5
+              else "min-max")
+    return {
+        "value": None if m.value is None else round(float(m.value), 4),
+        "history_start": hist.index.min().strftime("%Y-%m-%d") if len(hist) else None,
+        "n_obs": int(len(hist)),
+        "inverted": m.invert,
+        "method": method,
+        "window_years": round(m.window_days / 365, 1),
+    }
 
 
 def compute_froth_payload(as_of: pd.Timestamp | None = None,
@@ -105,12 +156,49 @@ def compute_froth_payload(as_of: pd.Timestamp | None = None,
     """Full froth-score output dict for today (or ``as_of``)."""
     store = store or HistoryStore()
     as_of = (as_of or pd.Timestamp.now()).normalize()
-    metrics, prior, stale = load_metric_inputs(store, as_of)
+    metrics, prior, stale, pillars = load_metric_inputs(store, as_of)
     if stale:
         logger.warning("regime: excluding stale metrics %s", stale)
     result = compute_froth_score(metrics, prior_scores=prior)
     result["stale_metrics"] = stale
     result["as_of"] = as_of.strftime("%Y-%m-%d")
+
+    for m in metrics:
+        detail = _metric_detail(m)
+        detail["last_date"] = store.read(m.name).dropna().index.max().strftime("%Y-%m-%d")
+        result["metrics"][m.name].update(detail)
+
+    # Trailing series for the report charts; consumers that only need
+    # today's numbers (feature layer, briefing pack) ignore this block.
+    # Charts carry each pillar forward between releases (a quarterly series
+    # still counts until its next print, as it does in today's score).
+    pillars_ff = pillars.ffill()
+    history: dict[str, Any] = {
+        "composite": _ending_today(
+            _monthly_points(composite_from_pillars(pillars_ff), CHART_YEARS, as_of, 1),
+            as_of, result["composite_score"]),
+        "pillars": {p: _ending_today(_monthly_points(pillars_ff[p], CHART_YEARS, as_of, 1),
+                                     as_of, result["pillar_scores"].get(p))
+                    for p in pillars_ff.columns},
+        "structural": _ending_today(
+            _monthly_points(pillars_ff[["valuation", "leverage"]].mean(axis=1),
+                            CHART_YEARS, as_of, 1), as_of, result["structural_score"]),
+        "timing": _ending_today(
+            _monthly_points(pillars_ff[["positioning", "liquidity"]].mean(axis=1),
+                            CHART_YEARS, as_of, 1), as_of, result["timing_score"]),
+        "metrics": {m.name: _monthly_points(store.read(m.name), CHART_YEARS, as_of, 4)
+                    for m in metrics},
+    }
+    spx = store.read("spx_close").dropna()
+    if len(spx):
+        spx = spx[spx.index >= as_of - pd.DateOffset(years=SPX_CHART_YEARS)]
+        history["spx_close"] = [[d.strftime("%Y-%m-%d"), round(float(v), 2)]
+                                for d, v in spx.resample("W-FRI").last().dropna().items()]
+    dgs2, dgs10 = store.read("dgs2"), store.read("dgs10")
+    if len(dgs2) and len(dgs10):
+        curve = (dgs10 - dgs2).dropna()
+        history["spread_2s10s"] = _monthly_points(curve, CHART_YEARS, as_of, 2)
+    result["history"] = history
     return result
 
 
@@ -133,21 +221,27 @@ def compute_regime_payload(store: HistoryStore | None = None) -> dict[str, Any]:
     return regime.as_dict()
 
 
-def latest_output_dir(output_root: Path | None = None) -> Path | None:
+def latest_output_dir(output_root: Path | None = None,
+                      as_of: str | None = None) -> Path | None:
+    """Newest dated regime output dir, optionally the newest on/before *as_of*."""
     root = (output_root or settings.output_root) / OUTPUT_DIRNAME
     if not root.is_dir():
         return None
     dated = sorted(d for d in root.iterdir() if d.is_dir())
+    if as_of:
+        dated = [d for d in dated if d.name <= as_of]
     return dated[-1] if dated else None
 
 
-def load_latest_context(max_age_days: int = 4) -> dict[str, Any] | None:
+def load_latest_context(max_age_days: int = 4,
+                        as_of: str | None = None) -> dict[str, Any] | None:
     """Newest froth_score.json contents, or None when stale/absent.
 
     ``max_age_days`` guards against weekend/holiday staleness being mistaken
-    for live data during the ticker batch.
+    for live data during the ticker batch. ``as_of`` (YYYY-MM-DD) picks the
+    newest file on or before that date, for re-rendering a past report.
     """
-    out_dir = latest_output_dir()
+    out_dir = latest_output_dir(as_of=as_of) if as_of else latest_output_dir()
     if out_dir is None:
         logger.info("regime: no froth-score outputs yet")
         return None
@@ -159,7 +253,8 @@ def load_latest_context(max_age_days: int = 4) -> dict[str, Any] | None:
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("regime: unreadable %s: %s", path, exc)
         return None
-    age = (pd.Timestamp.now().normalize() - pd.Timestamp(payload.get("as_of"))).days
+    anchor = pd.Timestamp(as_of) if as_of else pd.Timestamp.now().normalize()
+    age = (anchor - pd.Timestamp(payload.get("as_of"))).days
     if not pd.isna(age) and age > max_age_days:
         logger.info("regime: froth score from %s is %d days old — ignoring",
                     payload.get("as_of"), age)

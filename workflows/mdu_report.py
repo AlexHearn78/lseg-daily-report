@@ -23,8 +23,20 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lseg_quant.mdu.config import UNIVERSE, load_report_config
-from lseg_quant.briefing.render import briefing_email_rows, briefing_page_html, load_briefing
+from lseg_quant.briefing.render import (
+    briefing_email_rows,
+    briefing_page_html,
+    load_briefing,
+    load_charts,
+)
 from lseg_quant.regime.daily import load_latest_context
+from lseg_quant.regime.report import (
+    froth_detail_html,
+    pillar_detail_html,
+    regime_detail_html,
+)
+from lseg_quant.regime.score import PILLAR_WEIGHTS
+from lseg_quant.reporting.clickthrough import CLICK_CSS, CLICK_JS, click_attrs
 from lseg_quant.reporting import theme as house
 
 logger = logging.getLogger("mdu_report")
@@ -55,10 +67,38 @@ def _briefing(date_str: str) -> tuple[dict | None, dict | None]:
     return load_briefing(BRIEFING_ROOT / date_str.replace("-", ""))
 
 
+PACK_SCRIPT_ID = "briefing-pack"
+
+
+def _pack_block(pack: dict | None) -> str:
+    """The briefing pack as an inert JSON block, for the Claude chat skill to read.
+
+    ``<`` is escaped so that text inside news stories cannot close the tag.
+    """
+    if not pack:
+        return ""
+    data = json.dumps(pack, ensure_ascii=False, default=str).replace("<", "\\u003c")
+    return f'<script type="application/json" id="{PACK_SCRIPT_ID}">{data}</script>'
+
+
 def _froth_context(pack: dict | None) -> dict | None:
     """The run's froth snapshot from its briefing pack, else the latest score."""
     froth = ((pack or {}).get("macro") or {}).get("froth")
     return froth if froth and froth.get("composite_score") is not None else load_latest_context()
+
+
+def _risk_detail(froth: dict | None, date_str: str) -> dict | None:
+    """Full froth_score.json behind the run's froth snapshot, for the click-throughs."""
+    as_of = (froth or {}).get("as_of") or date_str
+    ctx = load_latest_context(as_of=as_of)
+    if not ctx or not ctx.get("pillar_scores"):
+        return None
+    if froth and froth.get("composite_score") != ctx.get("composite_score"):
+        # The detail must explain the numbers on the page, not another day's.
+        logger.warning("froth detail skipped: file composite %s != report composite %s",
+                       ctx.get("composite_score"), froth.get("composite_score"))
+        return None
+    return ctx
 
 
 # ------------------------------------------------------------------
@@ -858,8 +898,22 @@ def gen_html(run: RunData) -> str:
         warning_block = f'<div style="background:rgba(255,69,58,0.1);border:1px solid rgba(255,69,58,0.3);border-radius:8px;padding:10px 16px;margin-bottom:20px;color:#FF453A;font-size:13px"><ul style="margin:0;padding-left:16px">{wlis}</ul></div>'
 
     sections, pack = _briefing(date_str)
-    briefing_block = briefing_page_html(sections, pack) if sections else ""
     froth = _froth_context(pack)
+    risk = _risk_detail(froth, date_str)
+    pillar_details = ({p: pillar_detail_html(risk, p) for p in PILLAR_WEIGHTS}
+                      if risk else None)
+    charts = load_charts(BRIEFING_ROOT / date_str.replace("-", ""))
+    briefing_block = (briefing_page_html(sections, pack, pillar_details, charts)
+                      if sections else "")
+    froth_click = (f'class="stat-card detail-click" '
+                   f'{click_attrs("risk-froth", "Show how the froth score is built")}'
+                   if risk else 'class="stat-card"')
+    regime_click = (f'class="stat-card detail-click" '
+                    f'{click_attrs("risk-regime", "Show the regime rules and readings")}'
+                    if risk else 'class="stat-card"')
+    risk_panels = (f'<div class="detail-panel wide" id="risk-froth">{froth_detail_html(risk)}</div>'
+                   f'<div class="detail-panel wide" id="risk-regime">{regime_detail_html(risk)}</div>'
+                   if risk else "")
     froth_score = froth.get("composite_score") if froth else None
     froth_num = f"{froth_score:.0f}" if froth_score is not None else "n/a"
     froth_band = _escape(str((froth or {}).get("band") or ""))
@@ -872,7 +926,7 @@ def gen_html(run: RunData) -> str:
 <title>{REPORT_TITLE} · {run_day}</title>
 <style>
 {font_face_css()}
-{CSS}</style>
+{CSS}{CLICK_CSS}</style>
 </head>
 <body>
 
@@ -917,17 +971,18 @@ def gen_html(run: RunData) -> str:
     <div class="stat-label">PORTFOLIO VALUE</div>
     <div class="stat-sub">simulated</div>
   </div>
-  <div class="stat-card">
+  <div {froth_click}>
     <div class="num" style="color:{house.froth_color(froth_score)}">{froth_num}</div>
     <div class="stat-label">FROTH</div>
     <div class="stat-sub">{froth_band}</div>
   </div>
-  <div class="stat-card">
+  <div {regime_click}>
     <div class="num cyan">{_escape(regime.replace("_", " "))}</div>
     <div class="stat-label">MACRO REGIME</div>
   </div>
   <div class="theme-line">{_escape(theme)}</div>
 </div>
+{risk_panels}
 
 {briefing_block}
 
@@ -949,6 +1004,7 @@ def gen_html(run: RunData) -> str:
 </div>
 
 <script>
+{CLICK_JS}
 function toggle(idx) {{
   var target = document.getElementById('dd-' + document.querySelectorAll('[data-target]')[idx].getAttribute('data-target').replace('dd-', ''));
   var icon = document.querySelectorAll('.expando-icon')[idx];
@@ -967,6 +1023,7 @@ function toggleNarrative(el) {{
   }}
 }}
 </script>
+{_pack_block(pack)}
 </body>
 </html>"""
 
