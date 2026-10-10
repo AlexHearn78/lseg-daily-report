@@ -54,7 +54,8 @@ class LsegMacroFeeds:
                to_date: str | None = None) -> pd.Series:
         """Full history for one indicator, paging through in ascending order.
 
-        The endpoint caps page size (~200 obs); we loop with a moving window.
+        The endpoint caps page size (about 120 obs); we loop with a moving
+        window until a page returns nothing new.
         """
         chunks: list[pd.DataFrame] = []
         cursor = from_date
@@ -81,9 +82,12 @@ class LsegMacroFeeds:
             last = df["period"].max()
             if to_date and last >= pd.Timestamp(to_date):
                 break
-            if len(df) < 200:
+            # The service caps pages below the requested limit (about 120
+            # rows), so keep paging until a page brings nothing new.
+            nxt = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            if nxt == cursor:
                 break
-            cursor = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            cursor = nxt
 
         if not chunks:
             logger.warning("lseg_macro[%s]: no data returned", mnemonic)

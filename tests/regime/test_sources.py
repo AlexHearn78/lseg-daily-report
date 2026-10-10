@@ -101,3 +101,58 @@ def test_refresh_backfills_every_series(tmp_path) -> None:
     assert store.read("spx_close").index.min() <= pd.Timestamp("2016-10-11")
     # A second run fetches only the overlap window.
     assert lseg._start_for(store, "sofr", dt.date(2026, 10, 9)) == dt.date(2026, 9, 28)
+
+
+def test_parse_pricing_field_override() -> None:
+    payload = [{"headers": [{"name": "DATE"}, {"name": "BID"}, {"name": "MID_YLD_1"}],
+                "data": [["2026-10-09", 95.3, 5.24095], ["2026-10-08", 95.34, 5.23415]]}]
+    assert lseg.parse_pricing(payload).empty            # no default field
+    assert lseg.parse_pricing(payload, "MID_YLD_1").iloc[-1] == 5.24095
+
+
+class _YieldQuotes(_FakeLseg):
+    """Treasury quotes licensed: yields come from US2YT=X / US10YT=X, not the curve."""
+
+    def call_tool(self, name: str, args: dict) -> dict:
+        if name == "historical_pricing_summaries" and args["universe"] in ("US2YT=X", "US10YT=X"):
+            days = pd.bdate_range(args["start"], args["end"])
+            y = 4.79 if args["universe"] == "US2YT=X" else 5.24
+            body = [{"headers": [{"name": "DATE"}, {"name": "MID_YLD_1"}],
+                     "data": [[d.strftime("%Y-%m-%d"), y] for d in days]}]
+            return {"result": {"content": [{"text": json.dumps(body)}]}}
+        if name == "fixed_income_curves":
+            raise AssertionError("curve should not be needed")
+        return super().call_tool(name, args)
+
+
+def test_treasury_yields_prefer_benchmark_quotes(tmp_path) -> None:
+    from lseg_quant.regime.history import HistoryStore
+
+    store = HistoryStore(tmp_path)
+    assert lseg.refresh(store, _YieldQuotes(), today=dt.date(2026, 10, 9)) == {}
+    assert store.read("dgs10").iloc[-1] == 5.24
+    assert store.read("dgs2").iloc[-1] == 4.79
+    assert len(store.read("dgs10")) > 2000             # daily, not weekly
+
+
+class _PagedMacro:
+    """qa_macroeconomic that returns at most 120 rows a page, like the live service."""
+
+    def __init__(self) -> None:
+        self.months = pd.date_range("2015-01-01", "2026-08-01", freq="MS")
+
+    def call_tool(self, name: str, args: dict) -> dict:
+        opts = args["requests"][0]["options"]
+        start = pd.Timestamp(opts.get("from", "1900-01-01"))
+        page = [d for d in self.months if d >= start][:120]
+        rows = [{"period": d.strftime("%Y-%m"), "value": 1.0} for d in page]
+        body = [{"dataType": "series", "response": {"data": rows}}]
+        return {"result": {"content": [{"text": json.dumps(body)}]}}
+
+
+def test_macro_series_pages_past_the_service_cap() -> None:
+    from lseg_quant.regime.lseg_feeds import LsegMacroFeeds
+
+    s = LsegMacroFeeds(_PagedMacro()).series("USCONPRCE", from_date="2015-01-01")
+    assert len(s) == len(_PagedMacro().months)          # 140 months over two pages
+    assert s.index.max() == pd.Timestamp("2026-08-01")

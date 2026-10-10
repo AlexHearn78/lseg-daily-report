@@ -9,7 +9,8 @@ no other data keys:
 | ``sofr``             | ``USDSOFR=`` New York Fed SOFR fixing                |
 | ``effr``             | ``USONFFE=FEDR`` effective fed funds fixing          |
 | ``eurex_putcall_sx5e`` | ``.PRSTXE.EX`` Euro Stoxx 50 put/call ratio (Eurex) |
-| ``dgs2``, ``dgs10``  | YieldBook US government curve, 2y and 10y (fixed_income_curves) |
+| ``dgs2``, ``dgs10``  | ``US2YT=X`` / ``US10YT=X`` Treasury benchmark mid yield; |
+|                      | YieldBook government curve (fixed_income_curves) if not licensed |
 | ``cpi_yoy``          | ``USCONPRCE`` US CPI index, year-on-year (qa_macroeconomic) |
 
 Derived: ``funding_spread`` (SOFR - EFFR), ``real_policy_rate`` (EFFR - CPI
@@ -37,6 +38,9 @@ PRICING_RICS: dict[str, str] = {
     "effr": "USONFFE=FEDR",
     "eurex_putcall_sx5e": ".PRSTXE.EX",
 }
+# Treasury benchmark composite quotes carry no default field; read the mid yield.
+YIELD_RICS: dict[str, str] = {"dgs2": "US2YT=X", "dgs10": "US10YT=X"}
+YIELD_FIELD = "MID_YLD_1"
 CPI_MNEMONIC = "USCONPRCE"
 GVT_TERMS: dict[str, float] = {"dgs2": 2, "dgs10": 10}
 GVT_BATCH = 20                 # fixed_income_curves takes up to 20 curve entries per call
@@ -51,15 +55,16 @@ OVERLAP_DAYS = 10              # refetch window on incremental runs, to pick up 
 # Fetchers
 # ---------------------------------------------------------------------------
 
-def parse_pricing(payload: list[dict[str, Any]]) -> pd.Series:
+def parse_pricing(payload: list[dict[str, Any]], field: str | None = None) -> pd.Series:
     """Daily values from a historical_pricing_summaries response.
 
-    Uses the response's own ``defaultPricingField`` (TRDPRC_1 for an index,
-    FIXING_1 for a rate fixing, PUTCAL_RTO for a put/call ratio).
+    Uses *field* if given, else the response's own ``defaultPricingField``
+    (TRDPRC_1 for an index, FIXING_1 for a rate fixing, PUTCAL_RTO for a
+    put/call ratio).
     """
     points: dict[pd.Timestamp, float] = {}
     for item in payload:
-        field = item.get("defaultPricingField")
+        field = field or item.get("defaultPricingField")
         headers = [h["name"] for h in item.get("headers", [])]
         if not field or field not in headers or "DATE" not in headers:
             continue
@@ -71,7 +76,8 @@ def parse_pricing(payload: list[dict[str, Any]]) -> pd.Series:
     return pd.Series(points, dtype=float).sort_index()
 
 
-def pricing_series(mcp: MCPClient, ric: str, start: dt.date, end: dt.date) -> pd.Series:
+def pricing_series(mcp: MCPClient, ric: str, start: dt.date, end: dt.date,
+                   field: str | None = None) -> pd.Series:
     """Daily history for one RIC, fetched in date-range chunks."""
     parts: list[pd.Series] = []
     cursor = start
@@ -85,7 +91,7 @@ def pricing_series(mcp: MCPClient, ric: str, start: dt.date, end: dt.date) -> pd
         text = MCPClient._extract_text(resp)
         payload = json.loads(text) if text else {}
         rows = payload.get("data", []) if isinstance(payload, dict) else payload
-        parts.append(parse_pricing(rows))
+        parts.append(parse_pricing(rows, field))
         cursor = stop + dt.timedelta(days=1)
     out = pd.concat(parts) if parts else pd.Series(dtype=float)
     return out[~out.index.duplicated(keep="last")].sort_index()
@@ -202,14 +208,28 @@ def refresh(store: HistoryStore, mcp: MCPClient, today: dt.date | None = None) -
         except Exception as exc:  # noqa: BLE001 - source isolation
             errors[name] = str(exc)
             logger.warning("lseg %s (%s) failed: %s", name, ric, exc)
-    try:
-        start = min(_start_for(store, n, today) for n in GVT_TERMS)
-        for name, s in gvt_yields(mcp, _gvt_dates(start, today)).items():
-            if len(s):
-                store.upsert(name, s.rename(name))
-    except Exception as exc:  # noqa: BLE001
-        errors["gvt"] = str(exc)
-        logger.warning("lseg treasury yields failed: %s", exc)
+    missing: list[str] = []
+    for name, ric in YIELD_RICS.items():
+        try:
+            series = pricing_series(mcp, ric, _start_for(store, name, today), today, YIELD_FIELD)
+            if not len(series):
+                raise RuntimeError("no rows")
+            store.upsert(name, series.rename(name))
+        except Exception as exc:  # noqa: BLE001
+            logger.info("lseg %s (%s) unavailable (%s); trying the YieldBook curve", name, ric, exc)
+            missing.append(name)
+    if missing:
+        try:
+            start = min(_start_for(store, n, today) for n in missing)
+            for name, s in gvt_yields(mcp, _gvt_dates(start, today)).items():
+                if name in missing and len(s):
+                    store.upsert(name, s.rename(name))
+            missing = [n for n in missing if not len(store.read(n))]
+            if missing:
+                raise RuntimeError("fixed_income_curves returned no yields")
+        except Exception as exc:  # noqa: BLE001
+            errors["treasury_yields"] = str(exc)
+            logger.warning("lseg treasury yields failed: %s", exc)
     try:
         cpi = cpi_yoy(mcp, _start_for(store, "cpi_yoy", today))
         if len(cpi):
