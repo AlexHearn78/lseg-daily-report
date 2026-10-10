@@ -36,3 +36,18 @@ def test_duplicate_key_rejected(tmp_path: Path) -> None:
 def test_report_config_defaults(tmp_path: Path) -> None:
     assert load_report_config(tmp_path)["title"] == "Daily Report"
     assert load_report_config(FIXTURES)["title"] == "Test Report"
+
+
+def test_batch_skips_closed_markets(monkeypatch) -> None:
+    import datetime as dt
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "workflows"))
+    import mdu_batch
+
+    calls: list[str] = []
+    monkeypatch.setattr(mdu_batch, "run_ticker", lambda t, date=None: calls.append(t) or
+                        {"ticker": t, "group": "holding", "exit_code": 0, "duration_s": 0.0, "error": None})
+    results = mdu_batch.run_universe(date="2026-12-25")          # Christmas: every exchange shut
+    assert calls == [] and all(r["skipped"] for r in results)
+    assert mdu_batch.last_weekday(dt.date(2026, 10, 10)) == dt.date(2026, 10, 9)   # Saturday -> Friday

@@ -9,6 +9,7 @@ Usage:
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import subprocess
 import sys
@@ -17,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lseg_quant.mdu.config import UNIVERSE
+from lseg_quant.mdu.config import UNIVERSE, is_trading_day
 
 logger = logging.getLogger("mdu_batch")
 
@@ -83,13 +84,32 @@ def run_ticker(
     return result
 
 
+def last_weekday(today: dt.date | None = None) -> dt.date:
+    """Today on a weekday, otherwise the Friday before."""
+    today = today or dt.date.today()
+    while today.weekday() >= 5:
+        today -= dt.timedelta(days=1)
+    return today
+
+
 def run_universe(date: str | None = None) -> list[dict]:
-    """Run all tickers sequentially with error isolation."""
+    """Run all tickers sequentially with error isolation.
+
+    A name whose exchange is closed on the date is skipped and logged as
+    such, so a holiday never looks like a successful run.
+    """
     results: list[dict] = []
     total_start = time.time()
+    day = dt.date.fromisoformat(date) if date else last_weekday()
 
     for ticker in ALL_TICKERS:
-        result = run_ticker(ticker, date=date)
+        exchange = UNIVERSE[ticker].exchange
+        if not is_trading_day(day, exchange):
+            logger.info("[%s] skipped: %s is not a trading day on %s", ticker, day, exchange)
+            results.append({"ticker": ticker, "group": UNIVERSE[ticker].group, "exit_code": 0,
+                            "duration_s": 0.0, "error": None, "skipped": True})
+            continue
+        result = run_ticker(ticker, date=day.isoformat())
         results.append(result)
 
     total_elapsed = time.time() - total_start
@@ -97,10 +117,11 @@ def run_universe(date: str | None = None) -> list[dict]:
     failures = sum(1 for r in results if r["exit_code"] != 0)
 
     logger.info("=" * 60)
-    logger.info("BATCH COMPLETE: %d/%d OK, %d failed, %.1fs total",
-                successes, len(results), failures, total_elapsed)
+    skipped = sum(1 for r in results if r.get("skipped"))
+    logger.info("BATCH COMPLETE: %d/%d OK, %d failed, %d skipped (market closed), %.1fs total",
+                successes - skipped, len(results), failures, skipped, total_elapsed)
     for r in results:
-        status = "OK" if r["exit_code"] == 0 else "FAIL"
+        status = "SKIP" if r.get("skipped") else ("OK" if r["exit_code"] == 0 else "FAIL")
         group = "H" if r["group"] == "holding" else "W"
         logger.info("  [%s] %s %s (%.1fs)%s",
                     status, group, r["ticker"], r["duration_s"],
@@ -131,7 +152,7 @@ def main() -> int:
     import argparse
     p = argparse.ArgumentParser(description="Run the analyst across the universe")
     p.add_argument("--date", type=str, default=None,
-                   help="Calculation date (YYYY-MM-DD)")
+                   help="Calculation date (YYYY-MM-DD; default today, or Friday at a weekend)")
     p.add_argument("--no-report", action="store_true",
                    help="Skip HTML report generation")
     args = p.parse_args()
