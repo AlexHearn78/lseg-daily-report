@@ -366,17 +366,24 @@ class ResearchContext:
             atm_idx = min(str_cols, key=lambda x: abs(x - 100))
             atm_col = self.vol_surface[atm_idx]
 
-            atm_iv_1m = float(atm_col.iloc[0])
+            base_1m = pd.Timestamp(self.as_of).normalize()
+            i_1m = min(range(len(expiries)),
+                       key=lambda k: abs((pd.Timestamp(expiries[k]) - base_1m).days - 30))
+            atm_iv_1m = float(atm_col.iloc[i_1m])
 
             nearest_80 = min(str_cols, key=lambda x: abs(x - 80))
             nearest_90 = min(str_cols, key=lambda x: abs(x - 90))
             nearest_110 = min(str_cols, key=lambda x: abs(x - 110))
             nearest_120 = min(str_cols, key=lambda x: abs(x - 120))
 
+            # Label the expiry nearest each tenor, not the n-th row: a name
+            # with no weekly options would otherwise call a 6-week expiry "1w".
+            base = pd.Timestamp(self.as_of).normalize()
+            days = [(pd.Timestamp(e) - base).days for e in expiries]
+            targets = {"1w": 7, "1m": 30, "3m": 91, "6m": 182, "1y": 365}
             grid: dict[str, dict[str, float]] = {}
-            expiry_labels = ["1w", "1m", "3m", "6m", "1y"]
-            for i, expiry in enumerate(expiries[:5]):
-                label = expiry_labels[i] if i < len(expiry_labels) else str(expiry)
+            for label, target in targets.items():
+                i = min(range(len(days)), key=lambda k: abs(days[k] - target))
                 grid[label] = {
                     "atm": round(float(self.vol_surface[atm_idx].iloc[i]) * 100, 2),
                 }

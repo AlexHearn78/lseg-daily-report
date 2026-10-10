@@ -49,15 +49,15 @@ def _utc(value: Any) -> str:
 
 def fetch_snapshot(mcp: Any, key: str, today: dt.date) -> list[dict]:
     """Latest quarterly actuals plus next-quarter and FY1/FY2 consensus, as store rows."""
-    ticker = UNIVERSE[key].ric  # a bare ticker can match several companies, or none
+    ticker, ticker_type = UNIVERSE[key].ibes_id  # RIC unless the universe overrides it
     resp = mcp.call_tool("qa_ibes_consensus", {"requests": [
         {"dataType": "qa_ibes_actuals", "options": {
-            "ticker": ticker, "tickerType": "RIC", "measures": ["Eps", "Rev"], "periodType": "Quarter", "pIndex": 0}},
+            "ticker": ticker, "tickerType": ticker_type, "measures": ["Eps", "Rev"], "periodType": "Quarter", "pIndex": 0}},
         {"dataType": "qa_ibes_consensus", "options": {
-            "ticker": ticker, "tickerType": "RIC", "measures": ["Eps", "Rev"], "periodType": "Quarter",
+            "ticker": ticker, "tickerType": ticker_type, "measures": ["Eps", "Rev"], "periodType": "Quarter",
             "periodIndexStart": 0, "periodIndexEnd": 1}},
         {"dataType": "qa_ibes_consensus", "options": {
-            "ticker": ticker, "tickerType": "RIC", "measures": ["Eps", "Rev"], "periodType": "Year",
+            "ticker": ticker, "tickerType": ticker_type, "measures": ["Eps", "Rev"], "periodType": "Year",
             "periodIndexStart": 1, "periodIndexEnd": 2}},
     ]})
     result = resp.get("result", {})

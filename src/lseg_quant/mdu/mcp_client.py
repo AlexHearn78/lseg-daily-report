@@ -300,12 +300,19 @@ class MCPClient:
         return df
 
     def get_equity_vol_surface(self, ric: str, calculation_date: str | None = None) -> pd.DataFrame:
-        """Fetch equity vol surface. Returns empty DataFrame on data failure."""
+        """Fetch an equity vol surface; empty DataFrame on data failure.
+
+        Columns are moneyness in percent (100 = at the money) and values are
+        implied vols as decimals (0.42 = 42%), the units research._module_vol
+        reads. The tool itself returns moneyness as a fraction and vols in
+        percent.
+        """
         try:
             instrument = ric if ric.endswith("@RIC") else f"{ric}@RIC"
-            args = {"instrumentCode": instrument}
+            surfaces: dict[str, Any] = {"date_format": "Date", "strike_format": "Moneyness"}
             if calculation_date:
-                args["calculationDate"] = calculation_date
+                surfaces["dates"] = [calculation_date]
+            args = {"instrument": instrument, "surfaces": surfaces, "smiles": None}
             resp = self.call_tool("equity_vol_surface", args)
             if resp.get("result", {}).get("isError"):
                 logger.warning("equity_vol_surface unavailable for %s", ric)
@@ -319,7 +326,8 @@ class MCPClient:
                 data_rows = surface[1:]
                 expiry_dates = [r[0] for r in data_rows]
                 vals = [r[1:] for r in data_rows]
-                df = pd.DataFrame(vals, index=expiry_dates, columns=[float(h) for h in headers])
+                df = pd.DataFrame(vals, index=expiry_dates,
+                                  columns=[round(float(h) * 100, 4) for h in headers]) / 100
                 df.index.name = "expiry"
                 df.columns.name = "strike"
                 return df

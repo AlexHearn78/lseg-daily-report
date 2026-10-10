@@ -4,6 +4,8 @@
 #   ric       LSEG RIC of the primary listing; used for prices, news,
 #             IBES consensus and fundamentals (never a bare ticker)
 #   group     holding | watchlist  (holdings are listed first)
+#   ibes_ticker  optional: only if IBES does not recognise the RIC (it
+#             returns no consensus); give the IBES ticker, e.g. LIN for LIN.O
 #   exchange  trading calendar code (XNYS for all US listings, XLON, XETR, XPAR, XAMS,
 #             XCSE, XSWX, XSTO, XMIL, XMAD ...); the name is skipped on
 #             that exchange's holidays

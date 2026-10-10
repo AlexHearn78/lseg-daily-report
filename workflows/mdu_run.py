@@ -179,8 +179,9 @@ def run(as_of: dt.datetime, settings: MDUSettings | None = None,
             logger.info("  News headlines: %d", len(news))
 
             ibes = mcp.get_ibes_consensus(
-                ticker=settings.ric,
+                ticker=settings.ibes_ticker or settings.ric,
                 measures=["Eps", "Rev", "Ebitda", "Dps", "Fcf"],
+                ticker_type="Ticker" if settings.ibes_ticker else "RIC",
             )
             ibes, ccy_notes = align_consensus_currency(ibes, settings.currency)
             audit.record_data_snapshot("ibes_consensus", {"count": len(ibes)})
@@ -328,6 +329,7 @@ def main(argv: list[str] | None = None) -> int:
         ric=info.ric,
         ticker_display=info.ticker_display,
         currency=info.currency,
+        ibes_ticker=info.ibes_ticker,
         benchmark_ric=info.benchmark_ric,
     )
     return run(as_of, settings, ticker_key=args.ticker.upper().strip())

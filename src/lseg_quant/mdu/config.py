@@ -29,6 +29,12 @@ class TickerInfo:
     benchmark_ric: str = ".SPX"
     group: Literal["holding", "watchlist"] = "holding"
     exchange: str = "XNYS"           # pandas-market-calendars exchange code
+    ibes_ticker: str | None = None   # only when IBES does not know the RIC (e.g. LIN.O)
+
+    @property
+    def ibes_id(self) -> tuple[str, str]:
+        """(ticker, tickerType) for qa_ibes_consensus / qa_ibes_actuals."""
+        return (self.ibes_ticker, "Ticker") if self.ibes_ticker else (self.ric, "RIC")
 
     @property
     def ticker(self) -> str:
@@ -72,6 +78,7 @@ def load_universe(config_dir: Path = CONFIG_DIR) -> dict[str, TickerInfo]:
             benchmark_ric=row.get("benchmark_ric", default_benchmark),
             group=row.get("group", "holding"),
             exchange=row.get("exchange", "XNYS"),
+            ibes_ticker=row.get("ibes_ticker"),
         )
     if not universe:
         raise ValueError(f"{path} lists no names")
@@ -142,6 +149,7 @@ class MDUSettings:
     ric: str = "MSFT.O"  # RIC for news
     ticker_display: str = "MSFT"  # display label
     currency: str = "USD"  # quote currency, used to check consensus currency
+    ibes_ticker: str | None = None  # IBES override when the RIC is unknown to IBES
     benchmark_ric: str = ".SPX"
 
     # --- Scheduling ---
